@@ -1,19 +1,40 @@
-//Package http 是对http协议的封装
 package http
 
 import (
-	"github.com/joyme123/cats/config"
+	"log"
+	"net"
 )
 
-//Server 类，目前只支持http1.1和http2
-//addr是服务的监听地址
-//port是监听的端口
+//Server 的封装
 type Server struct {
-	srvname string
-	configs map[string]vhost
+	Response Response
+	Request  Request
 }
 
-//vhost,是虚拟Host的实现
-type vhost struct {
-	config config.Config
+type Config struct {
+}
+
+func (srv *Server) Config(config Config) {
+
+}
+
+// Start the server
+func (srv *Server) Start() {
+
+	listener, err := net.Listen("tcp", "127.0.0.1:8089")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		conn, err := listener.Accept()
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		go srv.Request.Parse(conn)
+	}
+
 }
