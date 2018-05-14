@@ -28,6 +28,8 @@ func (srv *Server) Config(config Config) {
 // Start the server
 func (srv *Server) Start() {
 
+	count := 0
+
 	listener, err := net.Listen("tcp", "127.0.0.1:8089")
 
 	if err != nil {
@@ -41,11 +43,15 @@ func (srv *Server) Start() {
 			log.Fatal(err)
 		}
 
+		count++
+
 		var handler Handler
 
 		handler.Response.Writer = conn
 
 		go handler.Parse(conn)
+
+		log.Printf("total create %d goroutines", count)
 	}
 
 }
@@ -78,7 +84,8 @@ func (srv *Handler) Parse(reader io.Reader) {
 		n, err := reader.Read(in[:])
 
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			return
 		}
 
 		if bodyLen > 0 {
@@ -107,7 +114,8 @@ func (srv *Handler) Parse(reader io.Reader) {
 			case '\r':
 				if firstline {
 					if len(info) < 2 {
-						log.Fatal("request parse error")
+						log.Println("request parse error")
+						return
 					}
 					req.Method = info[0]
 					req.URL = info[1]
@@ -164,7 +172,8 @@ func (srv *Handler) Parse(reader io.Reader) {
 							kend = false
 						}
 					} else {
-						log.Fatal("unexpect \\n")
+						log.Println("unexpect endline")
+						return
 					}
 					last = c
 				}

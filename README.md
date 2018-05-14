@@ -15,3 +15,7 @@
     --fastcgi       fastcgi协议的支持，用来支持php-fpm
     --header        用来支持自定义头
     --tls           用来支持https
+
+
+linux设置ulimit
+https://blog.csdn.net/bugall/article/details/45869183
