@@ -2,27 +2,30 @@ package http
 
 import (
 	"bytes"
-	"io"
 	"log"
 	"net"
+	"net/url"
+	"os"
 	"strconv"
 	"strings"
+
+	"github.com/joyme123/cats/config"
 )
 
 type Handler struct {
 	Response Response
 	Request  Request
+	conn     net.Conn
+	config   *(config.Config)
 }
 
 //Server 的封装
 type Server struct {
+	config *(config.Config)
 }
 
-type Config struct {
-}
-
-func (srv *Server) Config(config Config) {
-
+func (srv *Server) Config(config *config.Config) {
+	srv.config = config
 }
 
 // Start the server
@@ -30,7 +33,7 @@ func (srv *Server) Start() {
 
 	count := 0
 
-	listener, err := net.Listen("tcp", "127.0.0.1:8089")
+	listener, err := net.Listen("tcp", srv.config.Addr+":"+strconv.Itoa(srv.config.Port))
 
 	if err != nil {
 		log.Fatal(err)
@@ -47,19 +50,19 @@ func (srv *Server) Start() {
 
 		var handler Handler
 
+		handler.config = srv.config
+		handler.conn = conn
 		handler.Response.Writer = conn
 
-		go handler.Parse(conn)
-
-		log.Printf("total create %d goroutines", count)
+		go handler.Parse()
 	}
 
 }
 
 // Parse 函数用来解析输入流来构造请求头
-func (srv *Handler) Parse(reader io.Reader) {
+func (srv *Handler) Parse() {
 
-	req := srv.Request
+	req := &(srv.Request)
 
 	if req.Headers == nil {
 		req.Headers = make(map[string]string)
@@ -81,7 +84,7 @@ func (srv *Handler) Parse(reader io.Reader) {
 
 	for {
 
-		n, err := reader.Read(in[:])
+		n, err := srv.conn.Read(in[:])
 
 		if err != nil {
 			log.Println(err)
@@ -118,7 +121,7 @@ func (srv *Handler) Parse(reader io.Reader) {
 						return
 					}
 					req.Method = info[0]
-					req.URL = info[1]
+					req.URI = info[1]
 					req.Version = buf.String()
 					buf.Reset()
 				} else {
@@ -142,7 +145,7 @@ func (srv *Handler) Parse(reader io.Reader) {
 							// log.Printf("header %v", req.Headers)
 							bodyLen, err = strconv.Atoi(req.Headers["content-length"])
 							if err != nil {
-								// TODO 这个地方应该调用response进行输出
+								// TODO:这个地方应该调用response进行输出
 								// log.Fatal("err content length")
 								bodyLen = 0
 							}
@@ -178,10 +181,18 @@ func (srv *Handler) Parse(reader io.Reader) {
 					last = c
 				}
 			case ':':
-				if !kend {
-					k = strings.ToLower(buf.String())
-					buf.Reset()
-					kend = true
+				if firstline {
+					// 匹配第一行
+					buf.WriteByte(c)
+				} else {
+					if !kend {
+						k = strings.ToLower(buf.String())
+						buf.Reset()
+						kend = true
+					} else {
+						// 当前行已经匹配到:,说明当前匹配在value中
+						buf.WriteByte(c)
+					}
 				}
 				last = c
 			case ' ':
@@ -198,11 +209,64 @@ func (srv *Handler) Parse(reader io.Reader) {
 				endline = false
 			}
 		} // end for state machine
+	}
+}
 
-		// 解析完毕一个请求
+func (srv *Handler) close() {
+	// 检查该http请求的版本
+	if srv.Request.Version == "HTTP/1.0" {
+		if v, ok := srv.Request.Headers["connection"]; ok {
+			if strings.ToLower(v) != "keep-alive" {
+				// 不是长连接,断开
+				srv.conn.Close()
+			}
+		} else {
+			// 不是长连接,断开
+			srv.conn.Close()
+		}
+	} else {
+		if v, ok := srv.Request.Headers["connection"]; ok {
+			if strings.ToLower(v) == "close" {
+				// 不是长连接,断开
+				srv.conn.Close()
+			}
+		}
 	}
 }
 
 func (srv *Handler) Process() {
-	srv.Response.out()
+
+	defer srv.close()
+
+	// 解析完毕一个请求
+	if config.GetInstance().Log {
+		srv.Request.logger(os.Stdout)
+	}
+
+	srv.Response.Version = srv.Request.Version
+
+	var filepath string
+	if strings.HasPrefix(srv.Request.URI, "http") {
+		u, err := url.Parse(srv.Request.URI)
+		if err != nil {
+			srv.Response.error400()
+			srv.Response.out()
+			return
+		} else {
+			filepath = u.Path
+		}
+	} else {
+		filepath = srv.Request.URI
+	}
+
+	// 文件夹结尾,自动加上index文件
+	if strings.HasSuffix(filepath, "/") {
+		filepath = srv.config.RootDir + filepath + srv.config.Index
+	} else {
+		filepath = srv.config.RootDir + filepath
+	}
+
+	log.Println(filepath)
+	srv.Response.serveFile(filepath)
+
 }
