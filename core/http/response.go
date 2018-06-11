@@ -54,7 +54,7 @@ func (resp *Response) serveFile(filepath string) {
 	var fileerr error
 	resp.Body, fileerr = ioutil.ReadFile(filepath)
 	if fileerr != nil {
-		resp.error404()
+		resp.Error404()
 	} else {
 		resp.StatusCode = 200
 		resp.Desc = "OK"
@@ -89,14 +89,14 @@ func (resp *Response) serveFile(filepath string) {
 }
 
 // 只有serveFile调用
-func (resp *Response) error404() {
+func (resp *Response) Error404() {
 	//TODO: 读取不到文件,暂时返回404
 	resp.StatusCode = 404
 	resp.Desc = "error"
 	resp.Body = []byte("page not found")
 }
 
-func (resp *Response) error400() {
+func (resp *Response) Error400() {
 	resp.commonHeaders()
 	resp.StatusCode = 400
 	resp.Desc = "error"

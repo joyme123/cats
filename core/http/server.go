@@ -22,10 +22,16 @@ type Handler struct {
 //Server 的封装
 type Server struct {
 	config *(config.Config)
+	hub    Hub
 }
 
 func (srv *Server) Config(config *config.Config) {
 	srv.config = config
+}
+
+// 向server中注入组件
+func (srv *Server) Register(component *Component) {
+	srv.hub.Register(component)
 }
 
 // Start the server
@@ -249,7 +255,7 @@ func (srv *Handler) Process() {
 	if strings.HasPrefix(srv.Request.URI, "http") {
 		u, err := url.Parse(srv.Request.URI)
 		if err != nil {
-			srv.Response.error400()
+			srv.Response.Error400()
 			srv.Response.out()
 			return
 		} else {
@@ -261,9 +267,9 @@ func (srv *Handler) Process() {
 
 	// 文件夹结尾,自动加上index文件
 	if strings.HasSuffix(filepath, "/") {
-		filepath = srv.config.RootDir + filepath + srv.config.Index
+		filepath = srv.config.Root + filepath + srv.config.Index
 	} else {
-		filepath = srv.config.RootDir + filepath
+		filepath = srv.config.Root + filepath
 	}
 
 	log.Println(filepath)
