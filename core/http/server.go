@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"log"
 	"net"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -17,6 +16,7 @@ type Handler struct {
 	Request  Request
 	conn     net.Conn
 	config   *(config.Config)
+	srv      *Server
 }
 
 //Server 的封装
@@ -30,8 +30,8 @@ func (srv *Server) Config(config *config.Config) {
 }
 
 // 向server中注入组件
-func (srv *Server) Register(component *Component) {
-	srv.hub.Register(component)
+func (srv *Server) Register(component interface{}) {
+	srv.hub.Register(component.(Component))
 }
 
 // Start the server
@@ -59,6 +59,7 @@ func (srv *Server) Start() {
 		handler.config = srv.config
 		handler.conn = conn
 		handler.Response.Writer = conn
+		handler.srv = srv
 
 		go handler.Parse()
 	}
@@ -240,39 +241,20 @@ func (srv *Handler) close() {
 	}
 }
 
-func (srv *Handler) Process() {
+func (handler *Handler) Process() {
 
-	defer srv.close()
+	defer handler.close()
 
 	// 解析完毕一个请求
 	if config.GetInstance().Log {
-		srv.Request.logger(os.Stdout)
+		handler.Request.logger(os.Stdout)
 	}
 
-	srv.Response.Version = srv.Request.Version
+	handler.Response.Version = handler.Request.Version
 
-	var filepath string
-	if strings.HasPrefix(srv.Request.URI, "http") {
-		u, err := url.Parse(srv.Request.URI)
-		if err != nil {
-			srv.Response.Error400()
-			srv.Response.out()
-			return
-		} else {
-			filepath = u.Path
-		}
-	} else {
-		filepath = srv.Request.URI
+	for _, comp := range handler.srv.hub.container {
+		comp.Serve(&handler.Request, &handler.Response)
 	}
 
-	// 文件夹结尾,自动加上index文件
-	if strings.HasSuffix(filepath, "/") {
-		filepath = srv.config.Root + filepath + srv.config.Index
-	} else {
-		filepath = srv.config.Root + filepath
-	}
-
-	log.Println(filepath)
-	srv.Response.serveFile(filepath)
-
+	handler.Response.out()
 }

@@ -1,4 +1,4 @@
-package hub
+package index
 
 import (
 	"net/url"
@@ -8,7 +8,7 @@ import (
 )
 
 type Index struct {
-	Files []string
+	File  string
 	Index int
 	req   *http.Request
 	resp  *http.Response
@@ -37,7 +37,7 @@ func (index *Index) Serve(req *http.Request, resp *http.Response) {
 
 	// 文件夹结尾,自动加上index文件
 	if strings.HasSuffix(filepath, "/") {
-		filepath = filepath + "index.html"
+		filepath = filepath + index.File
 	}
 
 	req.URI = filepath

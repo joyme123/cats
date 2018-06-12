@@ -1,4 +1,4 @@
-package hub
+package serveFile
 
 import (
 	"io/ioutil"
@@ -16,17 +16,17 @@ type ServeFile struct {
 	resp    *http.Response
 }
 
-func (root *ServeFile) serveFile(filepath string) {
+func (server *ServeFile) serveFile(filepath string) {
 
 	var fileerr error
-	root.resp.Body, fileerr = ioutil.ReadFile(filepath)
+	server.resp.Body, fileerr = ioutil.ReadFile(filepath)
 	if fileerr != nil {
-		root.resp.Error404()
+		server.resp.Error404()
 	} else {
-		root.resp.StatusCode = 200
-		root.resp.Desc = "OK"
+		server.resp.StatusCode = 200
+		server.resp.Desc = "OK"
 
-		ctype, haveType := root.resp.Headers["Content-Type"]
+		ctype, haveType := server.resp.Headers["Content-Type"]
 		if !haveType {
 			lastIndex := strings.LastIndex(filepath, ".")
 			if lastIndex > 0 {
@@ -48,13 +48,19 @@ func (root *ServeFile) serveFile(filepath string) {
 				// }
 				ctype = "*/*"
 			}
-			root.resp.Headers["Content-Type"] = ctype
+			log.Printf("%v\n", server.resp.Headers)
+			server.resp.Headers["Content-Type"] = ctype
 		}
 	}
 }
 
-func (root *ServeFile) Start() {
+func (server *ServeFile) Start() {
 
+}
+
+func (server *ServeFile) commonHeaders() {
+	server.resp.AppendHeader("Connection", "keep-alive")
+	server.resp.AppendHeader("server", "cats")
 }
 
 func (server *ServeFile) Serve(req *http.Request, resp *http.Response) {
@@ -64,6 +70,7 @@ func (server *ServeFile) Serve(req *http.Request, resp *http.Response) {
 	filepath := server.RootDir + req.URI
 
 	log.Println(filepath)
+	server.commonHeaders()
 	server.serveFile(filepath)
 }
 

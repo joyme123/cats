@@ -14,5 +14,5 @@ type Component interface {
 	Shutdown()
 
 	// 获取index, index的作用是指定插件的执行顺序
-	GetIndex()
+	GetIndex() int
 }
