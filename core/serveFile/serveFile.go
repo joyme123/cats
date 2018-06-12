@@ -4,16 +4,25 @@ import (
 	"io/ioutil"
 	"log"
 	"mime"
+	"net/url"
+	"os"
 	"strings"
 
+	"github.com/joyme123/cats/config"
 	"github.com/joyme123/cats/core/http"
 )
 
 type ServeFile struct {
 	RootDir string
 	Index   int
+	Context *http.Context
 	req     *http.Request
 	resp    *http.Response
+}
+
+func (server *ServeFile) New(context *http.Context, config *config.Config) {
+	server.Context = context
+	server.RootDir = config.ServeFile
 }
 
 func (server *ServeFile) serveFile(filepath string) {
@@ -33,7 +42,6 @@ func (server *ServeFile) serveFile(filepath string) {
 
 				//TODO: 根据扩展名做的mime types是不对的,比如js文件会解析为image/jpeg, css会解析为text/html
 				ctype = mime.TypeByExtension(string([]byte(filepath)[lastIndex:]))
-				log.Println(string([]byte(filepath)[lastIndex:]))
 			}
 			if ctype == "" {
 				//TODO: 根据文件内容判断文件类型
@@ -67,9 +75,41 @@ func (server *ServeFile) Serve(req *http.Request, resp *http.Response) {
 	server.req = req
 	server.resp = resp
 
-	filepath := server.RootDir + req.URI
+	var filepath string
+	if strings.HasPrefix(req.URI, "http") {
+		u, err := url.Parse(req.URI)
+		if err != nil {
+			resp.Error400()
+			return
+		} else {
+			filepath = u.Path
+		}
+	} else {
+		filepath = req.URI
+	}
 
-	log.Println(filepath)
+	filepath = server.RootDir + filepath
+
+	// 文件夹结尾,自动加上index文件
+	if strings.HasSuffix(filepath, "/") {
+
+		if indexFiles, ok := server.Context.KeyValue["IndexFiles"]; ok {
+			for _, v := range indexFiles.([]string) {
+				_, err := os.Stat(filepath + v)
+				if err == nil {
+					// 文件存在
+					filepath = filepath + v
+					break
+				}
+			}
+		} else {
+			// 默认为index.html
+			filepath = filepath + "index.html"
+		}
+
+	}
+
+	log.Println("server file:", filepath)
 	server.commonHeaders()
 	server.serveFile(filepath)
 }

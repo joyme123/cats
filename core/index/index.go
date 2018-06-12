@@ -1,17 +1,21 @@
 package index
 
 import (
-	"net/url"
-	"strings"
-
+	"github.com/joyme123/cats/config"
 	"github.com/joyme123/cats/core/http"
 )
 
 type Index struct {
-	File  string
-	Index int
-	req   *http.Request
-	resp  *http.Response
+	Files   []string
+	Index   int
+	Context *http.Context
+	req     *http.Request
+	resp    *http.Response
+}
+
+func (index *Index) New(context *http.Context, config *config.Config) {
+	index.Context = context
+	index.Context.KeyValue["IndexFiles"] = config.Index
 }
 
 func (index *Index) Start() {
@@ -19,28 +23,7 @@ func (index *Index) Start() {
 }
 
 func (index *Index) Serve(req *http.Request, resp *http.Response) {
-	index.req = req
-	index.resp = resp
 
-	var filepath string
-	if strings.HasPrefix(req.URI, "http") {
-		u, err := url.Parse(req.URI)
-		if err != nil {
-			resp.Error400()
-			return
-		} else {
-			filepath = u.Path
-		}
-	} else {
-		filepath = req.URI
-	}
-
-	// 文件夹结尾,自动加上index文件
-	if strings.HasSuffix(filepath, "/") {
-		filepath = filepath + index.File
-	}
-
-	req.URI = filepath
 }
 
 func (index *Index) Shutdown() {

@@ -17,20 +17,22 @@ func main() {
 	conf = config.Config{
 		Addr:      "127.0.0.1",
 		Port:      8089,
-		ServeFile: "/home/jiang/go/src/github.com/joyme123/cats/test-web",
-		Index:     "index.html"}
+		ServeFile: "/home/jiang/projects/test-web",
+		Index:     []string{"index.htm", "index.html"}}
 
 	var server http.Server
 
-	server.Config(&conf)
+	server.Context(&conf)
 
-	if conf.Index != "" {
-		indexComp := index.Index{File: conf.Index}
+	if len(conf.Index) != 0 {
+		indexComp := index.Index{}
+		indexComp.New(server.GetContext(), &conf)
 		server.Register(&indexComp)
 	}
 
 	if conf.ServeFile != "" {
-		serveFileComp := serveFile.ServeFile{RootDir: conf.ServeFile}
+		serveFileComp := serveFile.ServeFile{}
+		serveFileComp.New(server.GetContext(), &conf)
 		server.Register(&serveFileComp)
 	}
 

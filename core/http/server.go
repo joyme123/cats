@@ -11,22 +11,35 @@ import (
 	"github.com/joyme123/cats/config"
 )
 
+// Context , server的context，用来保存一些配置
+type Context struct {
+	KeyValue map[string]interface{}
+}
+
+// Handler 一次连接的处理句柄
 type Handler struct {
 	Response Response
 	Request  Request
 	conn     net.Conn
-	config   *(config.Config)
 	srv      *Server
 }
 
 //Server 的封装
 type Server struct {
-	config *(config.Config)
-	hub    Hub
+	config  *config.Config
+	hub     Hub
+	context Context
 }
 
-func (srv *Server) Config(config *config.Config) {
+func (srv *Server) Context(config *config.Config) {
 	srv.config = config
+	srv.context.KeyValue = make(map[string]interface{})
+	srv.context.KeyValue["Addr"] = config.Addr
+	srv.context.KeyValue["Port"] = strconv.Itoa(config.Port)
+}
+
+func (srv *Server) GetContext() *Context {
+	return &(srv.context)
 }
 
 // 向server中注入组件
@@ -39,7 +52,7 @@ func (srv *Server) Start() {
 
 	count := 0
 
-	listener, err := net.Listen("tcp", srv.config.Addr+":"+strconv.Itoa(srv.config.Port))
+	listener, err := net.Listen("tcp", srv.context.KeyValue["Addr"].(string)+":"+srv.context.KeyValue["Port"].(string))
 
 	if err != nil {
 		log.Fatal(err)
@@ -56,7 +69,6 @@ func (srv *Server) Start() {
 
 		var handler Handler
 
-		handler.config = srv.config
 		handler.conn = conn
 		handler.Response.Writer = conn
 		handler.srv = srv

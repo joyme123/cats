@@ -8,5 +8,5 @@ type Config struct {
 	Addr      string
 	Port      int
 	ServeFile string
-	Index     string
+	Index     []string
 }
