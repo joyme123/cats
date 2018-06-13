@@ -1,16 +1,18 @@
 // http 包, 封装了plugin的注册,执行机制
 package http
 
-import "github.com/joyme123/cats/config"
+import (
+	"github.com/joyme123/cats/config"
+)
 
 // 所有的plugin都需要实现这个接口
 type Component interface {
 
 	// 组件初始化
-	New(context *Context, config *config.Config)
+	New(config *config.Config)
 
-	// 在服务启动时执行
-	Start()
+	// 在服务启动时执行, 注入本次连接的上下文环境
+	Start(context *Context)
 
 	// 在有请求到来时执行
 	Serve(req *Request, resp *Response)

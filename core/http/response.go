@@ -17,11 +17,14 @@ type Response struct {
 	Writer     io.Writer
 }
 
+func (resp *Response) Init(writer io.Writer) {
+	log.Println("初始化")
+	resp.Writer = writer
+	resp.Headers = make(map[string]string)
+}
+
 // 向Response中添加响应头
 func (resp *Response) AppendHeader(k string, v string) {
-	if resp.Headers == nil {
-		resp.Headers = make(map[string]string)
-	}
 	resp.Headers[k] = v
 }
 
@@ -60,4 +63,9 @@ func (resp *Response) out() {
 	if err != nil {
 		log.Println(err)
 	}
+}
+
+// 清空状态
+func (resp *Response) Clear() {
+	resp.Headers = make(map[string]string)
 }

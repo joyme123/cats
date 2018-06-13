@@ -6,6 +6,7 @@ import (
 	"github.com/joyme123/cats/config"
 	"github.com/joyme123/cats/core/http"
 	"github.com/joyme123/cats/core/index"
+	"github.com/joyme123/cats/core/mime"
 	"github.com/joyme123/cats/core/serveFile"
 )
 
@@ -22,19 +23,23 @@ func main() {
 
 	var server http.Server
 
-	server.Context(&conf)
+	server.Config(&conf)
 
 	if len(conf.Index) != 0 {
 		indexComp := index.Index{}
-		indexComp.New(server.GetContext(), &conf)
+		indexComp.New(&conf)
 		server.Register(&indexComp)
 	}
 
 	if conf.ServeFile != "" {
 		serveFileComp := serveFile.ServeFile{}
-		serveFileComp.New(server.GetContext(), &conf)
+		serveFileComp.New(&conf)
 		server.Register(&serveFileComp)
 	}
+
+	mimeComp := mime.Mime{}
+	mimeComp.New(&conf)
+	server.Register(&mimeComp)
 
 	server.Start()
 }

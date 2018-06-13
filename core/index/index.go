@@ -6,20 +6,21 @@ import (
 )
 
 type Index struct {
-	Files   []string
-	Index   int
-	Context *http.Context
-	req     *http.Request
-	resp    *http.Response
+	Files      []string
+	Index      int
+	IndexFiles []string
+	Context    *http.Context // handler的context
+	req        *http.Request
+	resp       *http.Response
 }
 
-func (index *Index) New(context *http.Context, config *config.Config) {
+func (index *Index) New(config *config.Config) {
+	index.IndexFiles = config.Index
+}
+
+func (index *Index) Start(context *http.Context) {
 	index.Context = context
-	index.Context.KeyValue["IndexFiles"] = config.Index
-}
-
-func (index *Index) Start() {
-
+	index.Context.KeyValue["IndexFiles"] = index.IndexFiles
 }
 
 func (index *Index) Serve(req *http.Request, resp *http.Response) {

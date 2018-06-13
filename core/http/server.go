@@ -12,6 +12,9 @@ import (
 )
 
 // Context , server的context，用来保存一些配置
+// 全局使用的有:
+// FilePath代表指向的文件路径
+// IndexFiles代表索引的文件
 type Context struct {
 	KeyValue map[string]interface{}
 }
@@ -22,24 +25,19 @@ type Handler struct {
 	Request  Request
 	conn     net.Conn
 	srv      *Server
+
+	// FIXME: handler应该有自己的context，用来标记一个连接处理的上下文
+	context Context
 }
 
 //Server 的封装
 type Server struct {
-	config  *config.Config
-	hub     Hub
-	context Context
+	config *config.Config
+	hub    Hub
 }
 
-func (srv *Server) Context(config *config.Config) {
+func (srv *Server) Config(config *config.Config) {
 	srv.config = config
-	srv.context.KeyValue = make(map[string]interface{})
-	srv.context.KeyValue["Addr"] = config.Addr
-	srv.context.KeyValue["Port"] = strconv.Itoa(config.Port)
-}
-
-func (srv *Server) GetContext() *Context {
-	return &(srv.context)
 }
 
 // 向server中注入组件
@@ -52,7 +50,7 @@ func (srv *Server) Start() {
 
 	count := 0
 
-	listener, err := net.Listen("tcp", srv.context.KeyValue["Addr"].(string)+":"+srv.context.KeyValue["Port"].(string))
+	listener, err := net.Listen("tcp", srv.config.Addr+":"+strconv.Itoa(srv.config.Port))
 
 	if err != nil {
 		log.Fatal(err)
@@ -69,13 +67,23 @@ func (srv *Server) Start() {
 
 		var handler Handler
 
-		handler.conn = conn
-		handler.Response.Writer = conn
-		handler.srv = srv
+		// 初始化响应对象
+		handler.Init(conn, srv)
+
+		for _, comp := range handler.srv.hub.container {
+			comp.Start(&handler.context)
+		}
 
 		go handler.Parse()
 	}
 
+}
+
+func (handler *Handler) Init(conn net.Conn, srv *Server) {
+	handler.Response.Init(conn)
+	handler.conn = conn
+	handler.srv = srv
+	handler.context = Context{make(map[string]interface{})}
 }
 
 // Parse 函数用来解析输入流来构造请求头
@@ -269,4 +277,12 @@ func (handler *Handler) Process() {
 	}
 
 	handler.Response.out()
+
+	// 清空handler的状态
+	handler.clear()
+}
+
+func (handler *Handler) clear() {
+	handler.Request.Clear()
+	handler.Response.Clear()
 }
