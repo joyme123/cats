@@ -86,7 +86,7 @@ func (mime *Mime) Start(context *http.Context) {
 func (mime *Mime) Serve(req *http.Request, resp *http.Response) {
 	mime.req = req
 	mime.resp = resp
-	ctype, haveType := mime.resp.Headers["Content-Type"]
+	ctype, haveType := mime.resp.Headers["content-type"]
 
 	if !haveType {
 		filepath := mime.Context.KeyValue["FilePath"].(string)
@@ -102,7 +102,7 @@ func (mime *Mime) Serve(req *http.Request, resp *http.Response) {
 		} else {
 			ctype = "text/plain"
 		}
-		mime.resp.Headers["Content-Type"] = ctype
+		mime.resp.Headers["content-type"] = ctype
 	}
 }
 

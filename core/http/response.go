@@ -18,7 +18,6 @@ type Response struct {
 }
 
 func (resp *Response) Init(writer io.Writer) {
-	log.Println("初始化")
 	resp.Writer = writer
 	resp.Headers = make(map[string]string)
 }
@@ -36,7 +35,7 @@ func (resp *Response) toBytes() []byte {
 	for k, v := range resp.Headers {
 		buf.WriteString(k + ": " + v + "\r\n")
 	}
-	buf.WriteString("Content-Length: " + strconv.Itoa(len(resp.Body)) + "\r\n")
+	buf.WriteString("content-length: " + strconv.Itoa(len(resp.Body)) + "\r\n")
 	buf.WriteString("\r\n")
 	buf.Write(resp.Body)
 

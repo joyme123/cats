@@ -40,7 +40,7 @@ func (server *ServeFile) Start(context *http.Context) {
 }
 
 func (server *ServeFile) commonHeaders() {
-	server.resp.AppendHeader("Connection", "keep-alive")
+	server.resp.AppendHeader("connection", "keep-alive")
 	server.resp.AppendHeader("server", "cats")
 }
 
