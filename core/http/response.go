@@ -17,11 +17,13 @@ type Response struct {
 	Writer     io.Writer
 }
 
+func (resp *Response) Init(writer io.Writer) {
+	resp.Writer = writer
+	resp.Headers = make(map[string]string)
+}
+
 // 向Response中添加响应头
 func (resp *Response) AppendHeader(k string, v string) {
-	if resp.Headers == nil {
-		resp.Headers = make(map[string]string)
-	}
 	resp.Headers[k] = v
 }
 
@@ -33,7 +35,7 @@ func (resp *Response) toBytes() []byte {
 	for k, v := range resp.Headers {
 		buf.WriteString(k + ": " + v + "\r\n")
 	}
-	buf.WriteString("Content-Length: " + strconv.Itoa(len(resp.Body)) + "\r\n")
+	buf.WriteString("content-length: " + strconv.Itoa(len(resp.Body)) + "\r\n")
 	buf.WriteString("\r\n")
 	buf.Write(resp.Body)
 
@@ -60,4 +62,9 @@ func (resp *Response) out() {
 	if err != nil {
 		log.Println(err)
 	}
+}
+
+// 清空状态
+func (resp *Response) Clear() {
+	resp.Headers = make(map[string]string)
 }

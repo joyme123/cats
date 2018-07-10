@@ -21,3 +21,7 @@ func (req *Request) logger(out io.Writer) {
 func (req *Request) loggerBody(out io.Writer) {
 	fmt.Fprintf(out, "%v", req.Body)
 }
+
+func (req *Request) Clear() {
+	req.Headers = make(map[string]string)
+}
