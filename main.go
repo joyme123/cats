@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/joyme123/cats/config"
@@ -12,29 +13,39 @@ import (
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
-	var conf config.Config
+	var vhost1 config.VHost
 
-	conf = config.Config{
+	vhost1 = config.VHost{
 		Addr:      "127.0.0.1",
 		Port:      8089,
 		ServeFile: "/home/jiang/projects/test-web",
 		Index:     []string{"index.htm", "index.html"}}
 
-	var server http.Server
+	var conf config.Config
 
-	server.Context(&conf)
+	conf.VHosts = append(conf.VHosts, vhost1)
 
-	if len(conf.Index) != 0 {
-		indexComp := index.Index{}
-		indexComp.New(server.GetContext(), &conf)
-		server.Register(&indexComp)
+	for _, vhost := range conf.VHosts {
+
+		fmt.Printf("%v\n", vhost)
+
+		var server http.Server
+
+		server.Context(&vhost)
+
+		if len(vhost.Index) != 0 {
+			indexComp := index.Index{}
+			indexComp.New(server.GetContext(), &vhost)
+			server.Register(&indexComp)
+		}
+
+		if vhost.ServeFile != "" {
+			serveFileComp := serveFile.ServeFile{}
+			serveFileComp.New(server.GetContext(), &vhost)
+			server.Register(&serveFileComp)
+		}
+
+		server.Start()
 	}
 
-	if conf.ServeFile != "" {
-		serveFileComp := serveFile.ServeFile{}
-		serveFileComp.New(server.GetContext(), &conf)
-		server.Register(&serveFileComp)
-	}
-
-	server.Start()
 }

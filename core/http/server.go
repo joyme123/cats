@@ -26,16 +26,16 @@ type Handler struct {
 
 //Server 的封装
 type Server struct {
-	config  *config.Config
+	vhost   *config.VHost
 	hub     Hub
 	context Context
 }
 
-func (srv *Server) Context(config *config.Config) {
-	srv.config = config
+func (srv *Server) Context(vhost *config.VHost) {
+	srv.vhost = vhost
 	srv.context.KeyValue = make(map[string]interface{})
-	srv.context.KeyValue["Addr"] = config.Addr
-	srv.context.KeyValue["Port"] = strconv.Itoa(config.Port)
+	srv.context.KeyValue["Addr"] = vhost.Addr
+	srv.context.KeyValue["Port"] = strconv.Itoa(vhost.Port)
 }
 
 func (srv *Server) GetContext() *Context {

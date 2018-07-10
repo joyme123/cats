@@ -20,9 +20,9 @@ type ServeFile struct {
 	resp    *http.Response
 }
 
-func (server *ServeFile) New(context *http.Context, config *config.Config) {
+func (server *ServeFile) New(context *http.Context, vhost *config.VHost) {
 	server.Context = context
-	server.RootDir = config.ServeFile
+	server.RootDir = vhost.ServeFile
 }
 
 func (server *ServeFile) serveFile(filepath string) {

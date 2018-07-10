@@ -7,7 +7,7 @@ import "github.com/joyme123/cats/config"
 type Component interface {
 
 	// 组件初始化
-	New(context *Context, config *config.Config)
+	New(context *Context, vhost *config.VHost)
 
 	// 在服务启动时执行
 	Start()

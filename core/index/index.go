@@ -13,9 +13,9 @@ type Index struct {
 	resp    *http.Response
 }
 
-func (index *Index) New(context *http.Context, config *config.Config) {
+func (index *Index) New(context *http.Context, vhost *config.VHost) {
 	index.Context = context
-	index.Context.KeyValue["IndexFiles"] = config.Index
+	index.Context.KeyValue["IndexFiles"] = vhost.Index
 }
 
 func (index *Index) Start() {
