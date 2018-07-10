@@ -89,7 +89,7 @@ func (mime *Mime) Serve(req *http.Request, resp *http.Response) {
 	ctype, haveType := mime.resp.Headers["content-type"]
 
 	if !haveType {
-		filepath := mime.Context.KeyValue["FilePath"].(string)
+		filepath := mime.req.Context["FilePath"].(string)
 		lastIndex := strings.LastIndex(filepath, ".")
 
 		if lastIndex > 0 {

@@ -12,6 +12,7 @@ type Request struct {
 	Version string
 	Headers map[string]string
 	Body    []byte
+	Context map[string]interface{}
 }
 
 func (req *Request) logger(out io.Writer) {

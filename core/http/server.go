@@ -56,6 +56,8 @@ func (srv *Server) Start() {
 		log.Fatal(err)
 	}
 
+	log.Printf("server start on %s:%d\n", srv.vhost.Addr, srv.vhost.Port)
+
 	for {
 		conn, err := listener.Accept()
 
@@ -93,6 +95,10 @@ func (srv *Handler) Parse() {
 
 	if req.Headers == nil {
 		req.Headers = make(map[string]string)
+	}
+
+	if req.Context == nil {
+		req.Context = make(map[string]interface{})
 	}
 
 	var in [1024]byte

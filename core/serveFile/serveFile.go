@@ -19,34 +19,34 @@ type ServeFile struct {
 	resp    *http.Response
 }
 
-func (server *ServeFile) New(vhost *config.VHost) {
-	server.RootDir = vhost.ServeFile
+func (serverFile *ServeFile) New(vhost *config.VHost) {
+	serverFile.RootDir = vhost.ServeFile
 }
 
-func (server *ServeFile) serveFile(filepath string) {
+func (serverFile *ServeFile) serveFile(filepath string) {
 
 	var fileerr error
-	server.resp.Body, fileerr = ioutil.ReadFile(filepath)
+	serverFile.resp.Body, fileerr = ioutil.ReadFile(filepath)
 	if fileerr != nil {
-		server.resp.Error404()
+		serverFile.resp.Error404()
 	} else {
-		server.resp.StatusCode = 200
-		server.resp.Desc = "OK"
+		serverFile.resp.StatusCode = 200
+		serverFile.resp.Desc = "OK"
 	}
 }
 
-func (server *ServeFile) Start(context *http.Context) {
-	server.Context = context
+func (serverFile *ServeFile) Start(context *http.Context) {
+	serverFile.Context = context
 }
 
-func (server *ServeFile) commonHeaders() {
-	server.resp.AppendHeader("connection", "keep-alive")
-	server.resp.AppendHeader("server", "cats")
+func (serverFile *ServeFile) commonHeaders() {
+	serverFile.resp.AppendHeader("connection", "keep-alive")
+	serverFile.resp.AppendHeader("server", "cats")
 }
 
-func (server *ServeFile) Serve(req *http.Request, resp *http.Response) {
-	server.req = req
-	server.resp = resp
+func (serverFile *ServeFile) Serve(req *http.Request, resp *http.Response) {
+	serverFile.req = req
+	serverFile.resp = resp
 
 	var filepath string
 	if strings.HasPrefix(req.URI, "http") {
@@ -61,12 +61,12 @@ func (server *ServeFile) Serve(req *http.Request, resp *http.Response) {
 		filepath = req.URI
 	}
 
-	filepath = server.RootDir + filepath
+	filepath = serverFile.RootDir + filepath
 
 	// 文件夹结尾,自动加上index文件
 	if strings.HasSuffix(filepath, "/") {
 
-		if indexFiles, ok := server.Context.KeyValue["IndexFiles"]; ok {
+		if indexFiles, ok := serverFile.Context.KeyValue["IndexFiles"]; ok {
 			for _, v := range indexFiles.([]string) {
 				_, err := os.Stat(filepath + v)
 				if err == nil {
@@ -82,18 +82,18 @@ func (server *ServeFile) Serve(req *http.Request, resp *http.Response) {
 
 	}
 
-	server.Context.KeyValue["FilePath"] = filepath
+	serverFile.req.Context["FilePath"] = filepath
 
 	log.Println("server file:", filepath)
-	server.commonHeaders()
-	server.serveFile(filepath)
+	serverFile.commonHeaders()
+	serverFile.serveFile(filepath)
 }
 
-func (server *ServeFile) Shutdown() {
+func (serverFile *ServeFile) Shutdown() {
 
 }
 
-func (server *ServeFile) GetIndex() int {
+func (serverFile *ServeFile) GetIndex() int {
 
-	return server.Index
+	return serverFile.Index
 }
