@@ -5,5 +5,5 @@ package config
 //addr是vhost的地址
 //port是端口号
 type Config struct {
-	VHosts []VHost
+	Sites []Site
 }

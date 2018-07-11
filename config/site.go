@@ -1,7 +1,7 @@
 package config
 
-// VHost，用来实例化一个server实例
-type VHost struct {
+// Site，用来实例化一个vhost实例
+type Site struct {
 	Addr       string
 	Port       int
 	ServerName string

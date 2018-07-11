@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strconv"
 	"sync"
 
 	"github.com/joyme123/cats/config"
@@ -11,26 +12,38 @@ import (
 	"github.com/joyme123/cats/core/serveFile"
 )
 
-func startServe(vhost config.VHost) {
+func startServe(sites []config.Site) {
 	var server http.Server
 
-	server.Config(&vhost)
-
-	if len(vhost.Index) != 0 {
-		indexComp := index.Index{}
-		indexComp.New(&vhost)
-		server.Register(&indexComp)
+	for _, site := range sites {
+		server.AddSite(&site)
 	}
 
-	if vhost.ServeFile != "" {
-		serveFileComp := serveFile.ServeFile{}
-		serveFileComp.New(&vhost)
-		server.Register(&serveFileComp)
-	}
+	server.Config(sites[0].Addr, sites[0].Port)
+	server.Init()
 
-	mimeComp := mime.Mime{}
-	mimeComp.New(&vhost)
-	server.Register(&mimeComp)
+	// 根据sites实例化VirtualHost
+	for _, site := range sites {
+		var vh http.VirtualHost
+		vh.Init()
+		if len(site.Index) != 0 {
+			indexComp := index.Index{}
+			indexComp.New(&site, vh.GetContext())
+			vh.Register(&indexComp)
+		}
+
+		if site.ServeFile != "" {
+			serveFileComp := serveFile.ServeFile{}
+			serveFileComp.New(&site, vh.GetContext())
+			vh.Register(&serveFileComp)
+		}
+
+		mimeComp := mime.Mime{}
+		mimeComp.New(&site, vh.GetContext())
+		vh.Register(&mimeComp)
+
+		server.SetVirtualHost(site.ServerName, &vh)
+	}
 
 	server.Start()
 }
@@ -38,32 +51,58 @@ func startServe(vhost config.VHost) {
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
-	var vhost1 config.VHost
+	var site config.Site
 
-	vhost1 = config.VHost{
-		Addr:      "127.0.0.1",
-		Port:      8089,
-		ServeFile: "/home/jiang/projects/test-web",
-		Index:     []string{"index.htm", "index.html"}}
+	site = config.Site{
+		Addr:       "127.0.0.1",
+		Port:       8089,
+		ServerName: "mysite.com",
+		ServeFile:  "/home/jiang/projects/test-web",
+		Index:      []string{"index.htm", "index.html"}}
 
-	var vhost2 config.VHost
+	var site2 config.Site
 
-	vhost2 = config.VHost{
-		Addr:      "127.0.0.1",
-		Port:      8090,
-		ServeFile: "/home/jiang/projects/test-web",
-		Index:     []string{"index.htm", "index.html"}}
+	site2 = config.Site{
+		Addr:       "127.0.0.1",
+		Port:       8090,
+		ServerName: "mysite.com",
+		ServeFile:  "/home/jiang/projects/test-web",
+		Index:      []string{"index.htm", "index.html"}}
+
+	var site3 config.Site
+
+	site3 = config.Site{
+		Addr:       "127.0.0.1",
+		Port:       8090,
+		ServerName: "mysite2.com",
+		ServeFile:  "/home/jiang/projects/test-web/about",
+		Index:      []string{"index.htm", "index.html"}}
 
 	var conf config.Config
 
-	conf.VHosts = append(conf.VHosts, vhost1)
-	conf.VHosts = append(conf.VHosts, vhost2)
+	conf.Sites = append(conf.Sites, site)
+	conf.Sites = append(conf.Sites, site2)
+	conf.Sites = append(conf.Sites, site3)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	for _, vhost := range conf.VHosts {
-
-		go startServe(vhost)
+	wg.Add(2)
+	var groups map[string][]config.Site
+	groups = make(map[string][]config.Site)
+	for _, site := range conf.Sites {
+		// 这里要对site进行整理，拥有同样ip:host的形成一个group
+		addrPort := site.Addr + strconv.Itoa(site.Port)
+		if _, ok := groups[addrPort]; ok {
+			groups[addrPort] = append(groups[addrPort], site)
+		} else {
+			arr := []config.Site{site}
+			groups[addrPort] = arr
+		}
 	}
+
+	for _, v := range groups {
+		go startServe(v)
+	}
+
+	// 根据不同的group示例化不同的server,并注入host
 	wg.Wait()
 }

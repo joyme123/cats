@@ -14,13 +14,14 @@ type Index struct {
 	resp       *http.Response
 }
 
-func (index *Index) New(vhost *config.VHost) {
-	index.IndexFiles = vhost.Index
-}
-
-func (index *Index) Start(context *http.Context) {
+func (index *Index) New(site *config.Site, context *http.Context) {
+	index.IndexFiles = site.Index
 	index.Context = context
 	index.Context.KeyValue["IndexFiles"] = index.IndexFiles
+}
+
+func (index *Index) Start() {
+
 }
 
 func (index *Index) Serve(req *http.Request, resp *http.Response) {

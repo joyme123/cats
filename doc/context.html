@@ -30,14 +30,14 @@
             </pre>
             具体作用有以下：
             <ul>
-                <li>index组件、serveFile组件：index组件会向其中写入IndexFiles，也就是当url不指定具体资源时，默认加载的文件。index组件写入后，在之后的serveFile组件会根据这个值去寻找应该读取的文件，并向context中写入</li>
+                <li>index组件、serveFile组件：index组件会向其中写入IndexFiles，也就是当url不指定具体资源时，默认加载的文件。index组件写入后，在之后的serveFile组件会根据这个值去寻找应该读取的文件</li>
                 
             </ul>
         </p>
 
         <h2>4.一些要注意的点</h2>
         <p>
-            server的context中，应该只保存server中共享的，如果是要在一个request请求中共享一些值，应该使用request中的context，这是针对于一次请求的上下文
+            1.server的context中，应该只保存server中共享的，如果是要在一个request请求中共享一些值，应该使用request中的context，这是针对于一次请求的上下文
         </p>
     </div>
     

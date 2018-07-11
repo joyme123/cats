@@ -19,8 +19,9 @@ type ServeFile struct {
 	resp    *http.Response
 }
 
-func (serverFile *ServeFile) New(vhost *config.VHost) {
-	serverFile.RootDir = vhost.ServeFile
+func (serverFile *ServeFile) New(site *config.Site, context *http.Context) {
+	serverFile.RootDir = site.ServeFile
+	serverFile.Context = context
 }
 
 func (serverFile *ServeFile) serveFile(filepath string) {
@@ -35,8 +36,8 @@ func (serverFile *ServeFile) serveFile(filepath string) {
 	}
 }
 
-func (serverFile *ServeFile) Start(context *http.Context) {
-	serverFile.Context = context
+func (serverFile *ServeFile) Start() {
+
 }
 
 func (serverFile *ServeFile) commonHeaders() {

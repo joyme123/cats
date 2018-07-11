@@ -8,11 +8,10 @@ import (
 // 所有的plugin都需要实现这个接口
 type Component interface {
 
-	// 组件初始化
-	New(vhost *config.VHost)
+	// 组件初始化,注入VirtualHost的上下文环境
+	New(site *config.Site, context *Context)
 
-	// 在服务启动时执行, 注入本次连接的上下文环境
-	Start(context *Context)
+	Start()
 
 	// 在有请求到来时执行
 	Serve(req *Request, resp *Response)
