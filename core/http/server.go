@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 
@@ -25,38 +24,53 @@ type Handler struct {
 	Request  Request
 	conn     net.Conn
 	srv      *Server
-
-	// FIXME: handler应该有自己的context，用来标记一个连接处理的上下文
-	context Context
 }
 
 //Server 的封装
+//vhost是当前server的vhost配置
+//hub中保存的是当前server中注入的组件
 type Server struct {
-	vhost *config.VHost
-	hub   Hub
+	Addr  string
+	Port  int
+	sites []*config.Site
+	vhs   map[string]*VirtualHost
 }
 
-func (srv *Server) Config(vhost *config.VHost) {
-	srv.vhost = vhost
+func (srv *Server) Config(addr string, port int) {
+	srv.Addr = addr
+	srv.Port = port
 }
 
-// 向server中注入组件
-func (srv *Server) Register(component interface{}) {
-	srv.hub.Register(component.(Component))
+func (srv *Server) AddSite(site *config.Site) {
+	srv.sites = append(srv.sites, site)
+}
+
+func (srv *Server) Init() {
+	srv.vhs = make(map[string]*VirtualHost)
+}
+
+func (srv *Server) GetVirtualHost() map[string]*VirtualHost {
+	return srv.vhs
+}
+
+func (srv *Server) GetSite() []*config.Site {
+	return srv.sites
+}
+
+func (srv *Server) SetVirtualHost(serverName string, vh *VirtualHost) {
+	srv.vhs[serverName] = vh
 }
 
 // Start the server
 func (srv *Server) Start() {
 
-	count := 0
-
-	listener, err := net.Listen("tcp", srv.vhost.Addr+":"+strconv.Itoa(srv.vhost.Port))
+	listener, err := net.Listen("tcp", srv.Addr+":"+strconv.Itoa(srv.Port))
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("server start on %s:%d\n", srv.vhost.Addr, srv.vhost.Port)
+	log.Printf("server start on %s:%d\n", srv.Addr, srv.Port)
 
 	for {
 		conn, err := listener.Accept()
@@ -65,33 +79,48 @@ func (srv *Server) Start() {
 			log.Fatal(err)
 		}
 
-		count++
-
 		var handler Handler
 
 		// 初始化响应对象
 		handler.Init(conn, srv)
-
-		for _, comp := range handler.srv.hub.container {
-			comp.Start(&handler.context)
-		}
 
 		go handler.Parse()
 	}
 
 }
 
+/**
+ * 根据host去找对应的virtualhost
+ *
+ */
+func (srv *Server) findHost(host string) *VirtualHost {
+
+	// host要去掉端口号
+	arr := strings.Split(host, ":")
+
+	if len(arr) == 2 {
+		host = arr[0]
+	}
+
+	log.Println("匹配值是" + host)
+	if vh, ok := srv.vhs[host]; ok {
+		return vh
+	} else {
+		return srv.vhs[srv.sites[0].ServerName]
+	}
+}
+
 func (handler *Handler) Init(conn net.Conn, srv *Server) {
 	handler.Response.Init(conn)
 	handler.conn = conn
 	handler.srv = srv
-	handler.context = Context{make(map[string]interface{})}
 }
 
 // Parse 函数用来解析输入流来构造请求头
-func (srv *Handler) Parse() {
+func (handler *Handler) Parse() {
+	defer handler.close()
 
-	req := &(srv.Request)
+	req := &(handler.Request)
 
 	if req.Headers == nil {
 		req.Headers = make(map[string]string)
@@ -117,7 +146,7 @@ func (srv *Handler) Parse() {
 
 	for {
 
-		n, err := srv.conn.Read(in[:])
+		n, err := handler.conn.Read(in[:])
 
 		if err != nil {
 			log.Println(err)
@@ -138,7 +167,7 @@ func (srv *Handler) Parse() {
 				kend = false     //当前行是否已经匹配到: 了
 				info = make([]string, 0)
 
-				srv.Process()
+				handler.serverVh()
 			}
 
 		}
@@ -189,15 +218,13 @@ func (srv *Handler) Parse() {
 									req.Body = append(req.Body, in[index+1:index+bodyLen]...) //构造body结束
 									bodyLen = 0
 
-									// 整个请求已经解析结束，调用Process去处理
-									srv.Process()
+									handler.serverVh()
 								} else {
 									req.Body = append(req.Body, in[index+1:n]...) //构造body还没结束,但是in中的输入已经结束了
 									bodyLen = bodyLen - (n - index - 1)
 								}
 							} else {
-								// 整个请求已经解析结束，调用Process去处理
-								srv.Process()
+								handler.serverVh()
 							}
 							firstline = true //是否在匹配第一行
 							endline = false  //是否匹配完一行
@@ -245,50 +272,35 @@ func (srv *Handler) Parse() {
 	}
 }
 
-func (srv *Handler) close() {
+func (handler *Handler) serverVh() {
+	// 整个请求已经解析结束，调用Process去处理
+	vh := handler.srv.findHost(handler.Request.Headers["host"])
+	if vh != nil {
+		vh.ServeHttp(&(handler.Request), &(handler.Response))
+	} else {
+		// TODO: 这里如果请求的vhost不存在，要接输出错误页面
+		log.Println("无对应serverName的服务")
+	}
+}
+
+func (handler *Handler) close() {
 	// 检查该http请求的版本
-	if srv.Request.Version == "HTTP/1.0" {
-		if v, ok := srv.Request.Headers["connection"]; ok {
+	if handler.Request.Version == "HTTP/1.0" {
+		if v, ok := handler.Request.Headers["connection"]; ok {
 			if strings.ToLower(v) != "keep-alive" {
 				// 不是长连接,断开
-				srv.conn.Close()
+				handler.conn.Close()
 			}
 		} else {
 			// 不是长连接,断开
-			srv.conn.Close()
+			handler.conn.Close()
 		}
 	} else {
-		if v, ok := srv.Request.Headers["connection"]; ok {
+		if v, ok := handler.Request.Headers["connection"]; ok {
 			if strings.ToLower(v) == "close" {
 				// 不是长连接,断开
-				srv.conn.Close()
+				handler.conn.Close()
 			}
 		}
 	}
-}
-
-func (handler *Handler) Process() {
-
-	defer handler.close()
-
-	// 解析完毕一个请求
-	if config.GetInstance().Log {
-		handler.Request.logger(os.Stdout)
-	}
-
-	handler.Response.Version = handler.Request.Version
-
-	for _, comp := range handler.srv.hub.container {
-		comp.Serve(&handler.Request, &handler.Response)
-	}
-
-	handler.Response.out()
-
-	// 清空handler的状态
-	handler.clear()
-}
-
-func (handler *Handler) clear() {
-	handler.Request.Clear()
-	handler.Response.Clear()
 }

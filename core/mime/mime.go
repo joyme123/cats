@@ -15,7 +15,7 @@ type Mime struct {
 	Index   int
 }
 
-func (mime *Mime) New(vhost *config.VHost) {
+func (mime *Mime) New(site *config.Site, context *http.Context) {
 	mime.mimes = make(map[string]string)
 
 	// RFC https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Complete_list_of_MIME_types
@@ -77,10 +77,12 @@ func (mime *Mime) New(vhost *config.VHost) {
 	mime.mimes["3gp"] = "video/3gpp"
 	mime.mimes["3g2"] = "video/3gpp2"
 	mime.mimes["7z"] = "application/x-7z-compressed"
+
+	mime.Context = context
 }
 
-func (mime *Mime) Start(context *http.Context) {
-	mime.Context = context
+func (mime *Mime) Start() {
+
 }
 
 func (mime *Mime) Serve(req *http.Request, resp *http.Response) {
