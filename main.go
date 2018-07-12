@@ -32,7 +32,7 @@ func startServe(sites []config.Site) {
 			vh.Register(&indexComp)
 		}
 
-		if site.ServeFile != "" {
+		if site.Root != "" {
 			serveFileComp := serveFile.ServeFile{}
 			serveFileComp.New(&site, vh.GetContext())
 			vh.Register(&serveFileComp)
@@ -57,7 +57,7 @@ func main() {
 		Addr:       "127.0.0.1",
 		Port:       8089,
 		ServerName: "mysite.com",
-		ServeFile:  "/home/jiang/projects/test-web",
+		Root:       "/home/jiang/projects/test-web",
 		Index:      []string{"index.htm", "index.html"}}
 
 	var site2 config.Site
@@ -66,7 +66,7 @@ func main() {
 		Addr:       "127.0.0.1",
 		Port:       8090,
 		ServerName: "mysite.com",
-		ServeFile:  "/home/jiang/projects/test-web",
+		Root:       "/home/jiang/projects/test-web",
 		Index:      []string{"index.htm", "index.html"}}
 
 	var site3 config.Site
@@ -75,7 +75,7 @@ func main() {
 		Addr:       "127.0.0.1",
 		Port:       8090,
 		ServerName: "mysite2.com",
-		ServeFile:  "/home/jiang/projects/test-web/about",
+		Root:       "/home/jiang/projects/test-web/about",
 		Index:      []string{"index.htm", "index.html"}}
 
 	var conf config.Config

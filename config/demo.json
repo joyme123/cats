@@ -1,0 +1,7 @@
+
+{
+	"Addr": "127.0.0.1",
+    "Port": 8980,
+    "Root": "/home/jiang/projects/test-web",
+    "Component": ["Index", "Mime", "ServeFile"]
+}

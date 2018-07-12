@@ -20,7 +20,7 @@ type ServeFile struct {
 }
 
 func (serverFile *ServeFile) New(site *config.Site, context *http.Context) {
-	serverFile.RootDir = site.ServeFile
+	serverFile.RootDir = site.Root
 	serverFile.Context = context
 }
 

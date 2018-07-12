@@ -5,6 +5,6 @@ type Site struct {
 	Addr       string
 	Port       int
 	ServerName string
-	ServeFile  string
+	Root       string
 	Index      []string
 }
