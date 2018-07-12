@@ -2,7 +2,7 @@
 
 cats服务器是用go语言实现的一个http服务器。没有使用go语言的http库，是从tcp层开始实现的。
 
-![cats服务的结构图](img/cat-structure.png)
+![cats服务的结构图](https://github.com/joyme123/cats/raw/master/doc/img/cats-structure.jpg)
 
 
 ## 下面会记录一些在开发过程中的思考，设计等等细节</h2>
