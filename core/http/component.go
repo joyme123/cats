@@ -11,6 +11,7 @@ type Component interface {
 	// 组件初始化,注入VirtualHost的上下文环境
 	New(site *config.Site, context *Context)
 
+	// 在服务启动时执行
 	Start()
 
 	// 在有请求到来时执行
