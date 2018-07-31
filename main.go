@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/joyme123/cats/config"
+	"github.com/joyme123/cats/core/fastcgi"
 	"github.com/joyme123/cats/core/http"
 	"github.com/joyme123/cats/core/index"
 	"github.com/joyme123/cats/core/mime"
@@ -38,6 +39,13 @@ func startServe(sites []config.Site) {
 			vh.Register(&serveFileComp)
 		}
 
+		if site.FCGIPass != "" {
+			// 初始化fcgi
+			fastcgiComp := fastcgi.FastCGI{}
+			fastcgiComp.New(&site, vh.GetContext())
+			vh.Register(&fastcgiComp)
+		}
+
 		mimeComp := mime.Mime{}
 		mimeComp.New(&site, vh.GetContext())
 		vh.Register(&mimeComp)
@@ -57,8 +65,9 @@ func main() {
 		Addr:       "127.0.0.1",
 		Port:       8089,
 		ServerName: "mysite.com",
-		Root:       "/home/jiang/projects/test-web",
-		Index:      []string{"index.htm", "index.html"}}
+		Root:       "/home/jiang/projects/test-web/php",
+		Index:      []string{"index.php", "index.html"},
+		FCGIPass:   "127.0.0.1:9000"}
 
 	var site2 config.Site
 

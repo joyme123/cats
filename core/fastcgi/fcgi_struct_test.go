@@ -109,9 +109,7 @@ func TestFCGIParamsRecordToBlob(t *testing.T) {
 	body.ValueLength = 9
 	body.ValueData = []byte("text/html")
 
-	// 这里之所以要用取地址符，是因为
-	// https://stackoverflow.com/questions/40823315/go-x-does-not-implement-y-method-has-a-pointer-receiver
-	record.Body = &body
+	record.Body = body.ToBlob()
 
 	blob := record.ToBlob()
 
@@ -125,7 +123,7 @@ func TestFCGIParamsRecordToBlob(t *testing.T) {
 }
 
 func TestFCGIStdinRecordToBlob(t *testing.T) {
-	var record FCGIStdinRecord
+	var record FCGIStdioRecord
 
 	var header FCGIHeader
 
