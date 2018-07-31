@@ -7,4 +7,5 @@ type Site struct {
 	ServerName string
 	Root       string
 	Index      []string
+	FCgiPass   string
 }
