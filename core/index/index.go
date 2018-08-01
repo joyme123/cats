@@ -36,3 +36,7 @@ func (index *Index) GetIndex() int {
 
 	return index.Index
 }
+
+func (index *Index) GetContainer() string {
+	return "vhost"
+}

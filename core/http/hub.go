@@ -1,6 +1,7 @@
 package http
 
 type Hub struct {
+	// FIXME: 这里应该注入指针，这样才能保证是同一个组件对象
 	container []Component
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/joyme123/cats/core/fastcgi"
 	"github.com/joyme123/cats/core/http"
 	"github.com/joyme123/cats/core/index"
+	"github.com/joyme123/cats/core/location"
 	"github.com/joyme123/cats/core/mime"
 	"github.com/joyme123/cats/core/serveFile"
 )
@@ -33,17 +34,24 @@ func startServe(sites []config.Site) {
 			vh.Register(&indexComp)
 		}
 
+		// TODO: 这里先写死location的注册机制
+		locationComp := location.Location{}
+		locationComp.New(&site, vh.GetContext())
+		vh.Register(locationComp)
+
+		// serveFile应该注册到location组件中
 		if site.Root != "" {
 			serveFileComp := serveFile.ServeFile{}
 			serveFileComp.New(&site, vh.GetContext())
-			vh.Register(&serveFileComp)
+			locationComp.Register("/", "", &serveFileComp)
 		}
 
+		// fcgipass 应该注册到location组件中
 		if site.FCGIPass != "" {
 			// 初始化fcgi
 			fastcgiComp := fastcgi.FastCGI{}
 			fastcgiComp.New(&site, vh.GetContext())
-			vh.Register(&fastcgiComp)
+			locationComp.Register("~*", "^(.+)\\.php$", &fastcgiComp)
 		}
 
 		mimeComp := mime.Mime{}

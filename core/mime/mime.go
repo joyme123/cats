@@ -116,3 +116,7 @@ func (mime *Mime) GetIndex() int {
 
 	return mime.Index
 }
+
+func (mime *Mime) GetContainer() string {
+	return "vhost"
+}

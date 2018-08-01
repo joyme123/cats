@@ -100,6 +100,10 @@ func (fcgi *FastCGI) GetIndex() int {
 	return fcgi.Index
 }
 
+func (fcgi *FastCGI) GetContainer() string {
+	return "location"
+}
+
 // sendRecord 发送FastCGI 记录
 func (fcgi *FastCGI) sendRecord(record Record) {
 	if fcgi.fcgiConn == nil {

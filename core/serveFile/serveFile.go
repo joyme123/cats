@@ -75,3 +75,7 @@ func (serverFile *ServeFile) GetIndex() int {
 
 	return serverFile.Index
 }
+
+func (serverFile *ServeFile) GetContainer() string {
+	return "location"
+}
