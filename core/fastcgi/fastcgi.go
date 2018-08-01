@@ -6,6 +6,7 @@ import (
 
 	"github.com/joyme123/cats/config"
 	"github.com/joyme123/cats/core/http"
+	"github.com/joyme123/cats/utils"
 )
 
 // FastCGI 的结构体
@@ -16,12 +17,14 @@ type FastCGI struct {
 	req      *http.Request
 	resp     *http.Response
 	fcgiConn net.Conn // fcgi的连接
+	RootDir  string   // 根目录地址
 }
 
 // New 方法是FastCGI 的实例化
 func (fcgi *FastCGI) New(site *config.Site, context *http.Context) {
 	fcgi.sockAdrr = site.FCGIPass
 	fcgi.Context = context
+	fcgi.RootDir = site.Root
 }
 
 // Start 方法是FastCGI在服务启动时调用的方法
@@ -31,6 +34,9 @@ func (fcgi *FastCGI) Start() {
 
 // Serve 方法是FastCGI在有请求到来时被调用的方法
 func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
+
+	log.Println("fastcgi serve")
+
 	fcgi.req = req
 	fcgi.resp = resp
 
@@ -41,13 +47,45 @@ func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 
 	// 2.获取当前请求的请求头，将其传递给fastcgi 程序
 	var paramsRecord FCGIParamsRecord
-	paramsRecord.New(1, fcgi.req.Headers)
+	var params map[string]string
+	params = make(map[string]string)
+
+	var filepath string // 脚本文件的绝对路径
+	if indexFiles, ok := fcgi.Context.KeyValue["IndexFiles"]; ok {
+		filepath = utils.GetAbsolutePath(fcgi.RootDir, req.URI, indexFiles.([]string))
+	} else {
+		filepath = utils.GetAbsolutePath(fcgi.RootDir, req.URI, make([]string, 0, 0))
+	}
+
+	params["SCRIPT_FILENAME"] = filepath
+	params["QUERY_STRING"] = "a=123?b=345"
+	params["REQUEST_METHOD"] = req.Method
+	params["CONTENT_TYPE"] = req.Headers["content-type"]
+	params["CONTENT_LENGTH"] = req.Headers["content-length"]
+	params["SCRIPT_NAME"] = req.URI
+	params["REQUEST_URI"] = req.URI
+	params["DOCUMENT_URI"] = req.URI
+	params["DOCUMENT_ROOT"] = fcgi.RootDir
+	params["SERVER_PROTOCOL"] = req.Version
+	params["GATEWAY_INTERFACE"] = "CGI/1.1"
+	params["SERVER_SOFTWARE"] = "cats"
+	params["REMOTE_ADDR"] = "192.168.0.6"
+	params["REMOTE_PORT"] = "27869"
+	params["SERVER_ADDR"] = "127.0.0.1"
+	params["SERVER_PORT"] = "8090"
+	params["SERVER_NAME"] = "jiang"
+	// params["HTTP_ACCEPT"] =
+
+	paramsRecord.New(1, params)
 	fcgi.sendRecord(&paramsRecord)
 
 	// 3.创建并发送stdin请求
 	var stdinRecord FCGIStdioRecord
 	stdinRecord.New(1, []byte("a=hello&b=world"))
 	fcgi.sendRecord(&stdinRecord)
+	var emptyStdinRecord FCGIStdioRecord
+	emptyStdinRecord.New(1, []byte(""))
+	fcgi.sendRecord(&emptyStdinRecord)
 
 }
 
@@ -81,6 +119,7 @@ func (fcgi *FastCGI) sendRecord(record Record) {
 	fcgi.fcgiConn.Write(record.ToBlob())
 }
 
+// readHandler 负责从FastCGI应用程序中读取stdout,stderr,以及EndRequestRecord
 func (fcgi *FastCGI) readHandler() {
 
 	for {
