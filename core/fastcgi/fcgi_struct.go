@@ -168,6 +168,16 @@ type FCGIStdioRecord struct {
 	Body   []byte
 }
 
+// New 将二进制流转换成header
+func (header *FCGIHeader) New(data []byte) {
+	header.Version = data[0]
+	header.Type = data[1]
+	header.RequestID = uint16(data[2])<<8 + uint16(data[3])
+	header.ContentLength = uint16(data[4])<<8 + uint16(data[5])
+	header.PaddingLength = data[6]
+	header.Reserved = data[7]
+}
+
 // ToBlob 将请求头转换成二进制流
 func (header *FCGIHeader) ToBlob() []byte {
 	headerBytes := make([]byte, 8, 8)
@@ -296,10 +306,20 @@ func (record *FCGIParamsRecord) New(requestID uint16, pair map[string]string) {
 		}
 	} // end for keyvalue
 
+	bodyLen := len(bodyBytes)
+
+	// 填充字节，使得记录是8字节对齐的
+	if tail := uint8(bodyLen % 8); tail != 0 {
+		paddingLen := 8 - tail
+		record.Header.PaddingLength = paddingLen
+		paddingBytes := make([]byte, paddingLen, paddingLen)
+		bodyBytes = append(bodyBytes, paddingBytes...)
+	}
+
 	// FIXME: 判断bodyBytes的长度，根据该长度去决定是否生成多条FCGIParamsRecord。
 	// 单条FCGIParamsRecord的ContentLength最多65536
 	record.Body = bodyBytes
-	record.Header.ContentLength = uint16(len(bodyBytes))
+	record.Header.ContentLength = uint16(bodyLen)
 }
 
 // ToBlob 将FCGI_PARAMS转换成二进制流
@@ -397,9 +417,19 @@ func (record *FCGIStdioRecord) New(requestID uint16, data []byte) {
 	record.Header.RequestID = requestID
 	// TODO: padding length 可能要修改
 	record.Header.PaddingLength = 0
-	record.Header.ContentLength = uint16(len(data))
+
+	bodyLen := len(data)
+
+	// 填充字节，使得记录是8字节对齐的
+	if tail := uint8(bodyLen % 8); tail != 0 {
+		paddingLen := 8 - tail
+		record.Header.PaddingLength = paddingLen
+		paddingBytes := make([]byte, paddingLen, paddingLen)
+		data = append(data, paddingBytes...)
+	}
 
 	record.Body = data
+	record.Header.ContentLength = uint16(len(data))
 }
 
 // ToBlob FCGIStdinRecord 标准输入记录

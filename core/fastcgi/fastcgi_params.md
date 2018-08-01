@@ -1,4 +1,5 @@
-
+对fastcgi的一封较为详细的说明
+https://taozhijiang.github.io/201605/fastcgi-support-for-http-server-libmicrohttpd.html
 
 
 fastcgi程序在和web服务器交互时，需要传递很多的参数。

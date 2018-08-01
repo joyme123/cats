@@ -91,29 +91,14 @@ func TestFCGIEndRequestRecordToBlob(t *testing.T) {
 func TestFCGIParamsRecordToBlob(t *testing.T) {
 	var record FCGIParamsRecord
 
-	var header FCGIHeader
+	pair := make(map[string]string)
+	pair["Content-Type"] = "text/html"
 
-	header.Version = 1
-	header.Type = 1
-	header.RequestID = 1
-	header.ContentLength = 23
-	header.PaddingLength = 0
-	header.Reserved = 0
-
-	record.Header = header
-
-	var body FCGINameValuePair11
-
-	body.NameLength = 12
-	body.NameData = []byte("Content-Type")
-	body.ValueLength = 9
-	body.ValueData = []byte("text/html")
-
-	record.Body = body.ToBlob()
+	record.New(1, pair)
 
 	blob := record.ToBlob()
 
-	expect := []byte{1, 1, 0, 1, 0, 23, 0, 0, 12, 9, 'C', 'o', 'n', 't', 'e', 'n', 't', '-', 'T', 'y', 'p', 'e', 't', 'e', 'x', 't', '/', 'h', 't', 'm', 'l'}
+	expect := []byte{1, 4, 0, 1, 0, 24, 1, 0, 12, 9, 'C', 'o', 'n', 't', 'e', 'n', 't', '-', 'T', 'y', 'p', 'e', 't', 'e', 'x', 't', '/', 'h', 't', 'm', 'l', 0}
 
 	for i := range expect {
 		if blob[i] != expect[i] {
@@ -122,24 +107,14 @@ func TestFCGIParamsRecordToBlob(t *testing.T) {
 	}
 }
 
-func TestFCGIStdinRecordToBlob(t *testing.T) {
+func TestFCGIStdioRecordToBlob(t *testing.T) {
 	var record FCGIStdioRecord
 
-	var header FCGIHeader
-
-	header.Version = 1
-	header.Type = 1
-	header.RequestID = 1
-	header.ContentLength = 23
-	header.PaddingLength = 0
-	header.Reserved = 0
-
-	record.Header = header
-	record.Body = []byte("abcdabcdabcdabcd")
+	record.New(1, []byte("abcdabcdabcdabcd1"))
 
 	blob := record.ToBlob()
 
-	expect := []byte{1, 1, 0, 1, 0, 23, 0, 0, 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd'}
+	expect := []byte{1, 5, 0, 1, 0, 24, 7, 0, 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 0, 0, 0, 0, 0, 0, 0}
 
 	for i := range expect {
 		if blob[i] != expect[i] {

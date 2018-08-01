@@ -10,6 +10,7 @@ import (
 	"github.com/joyme123/cats/core/http"
 )
 
+// Location 组件
 type Location struct {
 	Index   int
 	Context *http.Context // handler的context
@@ -41,7 +42,7 @@ func (loc *Location) Start() {
 // Serve 方法是FastCGI在有请求到来时被调用的方法
 func (loc *Location) Serve(req *http.Request, resp *http.Response) {
 
-	log.Println("fastcgi serve")
+	log.Println("location serve")
 
 	loc.req = req
 	loc.resp = resp
@@ -101,11 +102,6 @@ func (loc *Location) GetIndex() int {
 	return loc.Index
 }
 
-// GetContainer 获取父容器
-func (loc *Location) GetContainer() string {
-	return "vhost"
-}
-
 // Register 向location组件中注入其他组件
 func (loc *Location) Register(modeStr string, regex string, comp interface{}) {
 
@@ -137,4 +133,9 @@ func (loc *Location) Register(modeStr string, regex string, comp interface{}) {
 		loc.defaultMatch = pattern
 		break
 	}
+}
+
+// GetContainer 获取父容器
+func (loc *Location) GetContainer() string {
+	return "vhost"
 }

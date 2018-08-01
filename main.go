@@ -37,7 +37,7 @@ func startServe(sites []config.Site) {
 		// TODO: 这里先写死location的注册机制
 		locationComp := location.Location{}
 		locationComp.New(&site, vh.GetContext())
-		vh.Register(locationComp)
+		vh.Register(&locationComp)
 
 		// serveFile应该注册到location组件中
 		if site.Root != "" {
