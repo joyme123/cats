@@ -73,7 +73,7 @@ func main() {
 		Addr:       "127.0.0.1",
 		Port:       8089,
 		ServerName: "mysite.com",
-		Root:       "/home/jiang/projects/test-web/php",
+		Root:       "/home/jiang/projects/test-web",
 		Index:      []string{"index.php", "index.html"},
 		FCGIPass:   "127.0.0.1:9000"}
 

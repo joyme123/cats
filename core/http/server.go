@@ -157,7 +157,7 @@ func (handler *Handler) Parse() {
 
 		if bodyLen > 0 {
 			if bodyLen > n {
-				req.Body = append(req.Body, in[0:n-1]...)
+				req.Body = append(req.Body, in[0:n]...)
 				bodyLen -= n
 				offset = n
 			} else {
