@@ -252,7 +252,6 @@ func (record *FCGIParamsRecord) New(requestID uint16, pair map[string]string) {
 	record.Header.Version = FCGIVersion1
 	record.Header.Type = FCGIParams
 	record.Header.RequestID = requestID
-	// TODO: padding length 可能要修改
 	record.Header.PaddingLength = 0
 
 	bodyBytes := make([]byte, 0, 0)

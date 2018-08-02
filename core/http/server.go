@@ -136,7 +136,7 @@ func (handler *Handler) Parse() {
 	var v string // header 的值,区分大小写
 	var last byte
 
-	bodyLen := 0
+	bodyLen := 0 // 要从流中读取的request body的长度
 	offset := 0
 
 	firstline := true         //是否在匹配第一行
@@ -229,14 +229,14 @@ func (handler *Handler) Parse() {
 							bodyLen, err = strconv.Atoi(req.Headers["content-length"])
 							if err != nil {
 								// TODO:这个地方应该调用response进行输出
-								// log.Fatal("err content length")
+								log.Println("err parse content length")
 								bodyLen = 0
 							}
 
 							if bodyLen > 0 {
 
-								if bodyLen+index <= n {
-									req.Body = append(req.Body, in[index+1:index+bodyLen]...) //构造body结束
+								if bodyLen+index <= n { // 当前数据流有包含body的所有内容
+									req.Body = append(req.Body, in[index+1:index+bodyLen+1]...) //构造body结束
 									bodyLen = 0
 
 									parseFinish = true
@@ -297,6 +297,9 @@ func (handler *Handler) Parse() {
 }
 
 func (handler *Handler) serverVh() {
+
+	log.Println("---------------------------处理开始------------------------------")
+
 	// 整个请求已经解析结束，调用Process去处理
 	vh := handler.srv.findHost(handler.Request.Headers["host"])
 	if vh != nil {
@@ -305,6 +308,8 @@ func (handler *Handler) serverVh() {
 		// TODO: 这里如果请求的vhost不存在，要接输出错误页面
 		log.Println("无对应serverName的服务")
 	}
+
+	log.Println("---------------------------处理结束------------------------------")
 }
 
 func (handler *Handler) close() {

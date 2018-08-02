@@ -131,6 +131,8 @@ func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 		emptyBytes := make([]byte, 0)
 		emptyStdinRecord.New(currentID, emptyBytes)
 		fcgi.sendRecord(&emptyStdinRecord)
+
+		fcgi.sendRecord(&emptyStdinRecord)
 	}
 
 	// 这里应该阻塞起来等待fastcgi程序响应
@@ -160,6 +162,7 @@ func (fcgi *FastCGI) GetContainer() string {
 
 // sendRecord 发送FastCGI 记录
 func (fcgi *FastCGI) sendRecord(record Record) {
+
 	// 通过fcgiConn发送记录
 	_, err := fcgi.fcgiConn.Write(record.ToBlob())
 
