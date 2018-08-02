@@ -70,7 +70,7 @@ type FCGIBeginRequestRecord struct {
 	Body   FCGIBeginRequestBody
 }
 
-// FCGIKeepConn 是FCGIBeginRequestBody的Flags的取值
+// FCGIKeepConn 是FCGIBeginRequestBody的Flags的取值, 取1保持连接 取0每次请求结束后会释放连接
 const FCGIKeepConn = 1
 
 // FCGIBeginRequestBody的Role取值
@@ -162,8 +162,8 @@ type FCGIParamsRecord struct {
 	Body   []byte // 因为contentLength是16位，所以body的最大长度是65536
 }
 
-// FCGIStdioRecord 是标准输入输出流
-type FCGIStdioRecord struct {
+// FCGIStdinRecord 是标准输入输出流
+type FCGIStdinRecord struct {
 	Header FCGIHeader
 	Body   []byte
 }
@@ -410,8 +410,8 @@ func (record *FCGIUnknownTypeRecord) ToBlob() []byte {
 	return blob
 }
 
-// New FCGIStdioRecord的初始化函数
-func (record *FCGIStdioRecord) New(requestID uint16, data []byte) {
+// New FCGIStdinRecord的初始化函数
+func (record *FCGIStdinRecord) New(requestID uint16, data []byte) {
 	record.Header.Version = FCGIVersion1
 	record.Header.Type = FCGIStdin
 	record.Header.RequestID = requestID
@@ -429,11 +429,11 @@ func (record *FCGIStdioRecord) New(requestID uint16, data []byte) {
 	}
 
 	record.Body = data
-	record.Header.ContentLength = uint16(len(data))
+	record.Header.ContentLength = uint16(bodyLen)
 }
 
 // ToBlob FCGIStdinRecord 标准输入记录
-func (record *FCGIStdioRecord) ToBlob() []byte {
+func (record *FCGIStdinRecord) ToBlob() []byte {
 	headerBytes := record.Header.ToBlob()
 
 	blob := append(headerBytes, record.Body...)

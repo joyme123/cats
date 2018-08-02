@@ -31,7 +31,7 @@ func (resp *Response) AppendHeader(k string, v string) {
 // 将响应转为字符串
 func (resp *Response) toBytes() []byte {
 
-	log.Printf("response body的为:%v,%s", len(resp.Body), string(resp.Body))
+	// log.Printf("response body的为:%v,%s", len(resp.Body), string(resp.Body))
 	var buf bytes.Buffer
 	startLine := fmt.Sprintf("%v %v %v\r\n", resp.Version, resp.StatusCode, resp.Desc)
 	buf.WriteString(startLine)

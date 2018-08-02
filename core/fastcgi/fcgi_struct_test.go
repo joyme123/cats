@@ -98,7 +98,7 @@ func TestFCGIParamsRecordToBlob(t *testing.T) {
 
 	blob := record.ToBlob()
 
-	expect := []byte{1, 4, 0, 1, 0, 24, 1, 0, 12, 9, 'C', 'o', 'n', 't', 'e', 'n', 't', '-', 'T', 'y', 'p', 'e', 't', 'e', 'x', 't', '/', 'h', 't', 'm', 'l', 0}
+	expect := []byte{1, 4, 0, 1, 0, 23, 1, 0, 12, 9, 'C', 'o', 'n', 't', 'e', 'n', 't', '-', 'T', 'y', 'p', 'e', 't', 'e', 'x', 't', '/', 'h', 't', 'm', 'l', 0}
 
 	for i := range expect {
 		if blob[i] != expect[i] {
@@ -107,15 +107,26 @@ func TestFCGIParamsRecordToBlob(t *testing.T) {
 	}
 }
 
-func TestFCGIStdioRecordToBlob(t *testing.T) {
-	var record FCGIStdioRecord
+func TestFCGIStdinRecordToBlob(t *testing.T) {
+	var record FCGIStdinRecord
 
 	record.New(1, []byte("abcdabcdabcdabcd1"))
 
 	blob := record.ToBlob()
 
-	expect := []byte{1, 5, 0, 1, 0, 24, 7, 0, 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 0, 0, 0, 0, 0, 0, 0}
+	expect := []byte{1, 5, 0, 1, 0, 17, 7, 0, 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', '1', 0, 0, 0, 0, 0, 0}
 
+	for i := range expect {
+		if blob[i] != expect[i] {
+			t.Errorf("record byte index %d error, actual: %v, expect: %v", i, blob[i], expect[i])
+		}
+	}
+
+	var emptyRecord FCGIStdinRecord
+	emptyRecord.New(1, []byte(""))
+
+	blob = emptyRecord.ToBlob()
+	expect = []byte{1, 5, 0, 1, 0, 0, 0, 0}
 	for i := range expect {
 		if blob[i] != expect[i] {
 			t.Errorf("record byte index %d error, actual: %v, expect: %v", i, blob[i], expect[i])

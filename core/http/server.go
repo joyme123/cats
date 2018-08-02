@@ -153,6 +153,8 @@ func (handler *Handler) Parse() {
 			return
 		}
 
+		parseFinish := false
+
 		if bodyLen > 0 {
 			if bodyLen > n {
 				req.Body = append(req.Body, in[0:n-1]...)
@@ -167,6 +169,7 @@ func (handler *Handler) Parse() {
 				kend = false     //当前行是否已经匹配到: 了
 				info = make([]string, 0)
 
+				parseFinish = true
 				handler.serverVh()
 			}
 
@@ -174,6 +177,10 @@ func (handler *Handler) Parse() {
 
 		// 一个简单的有限状态机
 		for index := offset; index < n; index++ {
+			if parseFinish {
+				// body已经解析结束了，直接break出去
+				break
+			}
 			c := in[index]
 			switch c {
 			case '\r':
@@ -183,8 +190,22 @@ func (handler *Handler) Parse() {
 						return
 					}
 					req.Method = info[0]
-					req.URI = info[1]
+					// 如果Method是Get，需要切割出QueryString
+					if req.Method == "GET" {
+						uriAndQuery := strings.SplitN(info[1], "?", 2) // 最多切割两个子串
+						if len(uriAndQuery) == 2 {
+							req.URI = uriAndQuery[0]
+							req.QueryString = uriAndQuery[1]
+						} else {
+							req.URI = uriAndQuery[0]
+						}
+
+					} else {
+						req.URI = info[1]
+					}
 					req.Version = buf.String()
+
+					info = make([]string, 0) // 重置info
 					buf.Reset()
 				} else {
 
@@ -218,6 +239,7 @@ func (handler *Handler) Parse() {
 									req.Body = append(req.Body, in[index+1:index+bodyLen]...) //构造body结束
 									bodyLen = 0
 
+									parseFinish = true
 									handler.serverVh()
 								} else {
 									req.Body = append(req.Body, in[index+1:n]...) //构造body还没结束,但是in中的输入已经结束了
@@ -225,6 +247,7 @@ func (handler *Handler) Parse() {
 								}
 							} else {
 								handler.serverVh()
+								parseFinish = true
 							}
 							firstline = true //是否在匹配第一行
 							endline = false  //是否匹配完一行
@@ -268,6 +291,7 @@ func (handler *Handler) Parse() {
 				last = c
 				endline = false
 			}
+
 		} // end for state machine
 	}
 }

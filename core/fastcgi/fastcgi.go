@@ -13,13 +13,15 @@ import (
 
 // FastCGI 的结构体
 type FastCGI struct {
-	Index    int
-	sockAdrr string        // fastcgi应用程序的socket地址
-	Context  *http.Context // handler的context
-	req      *http.Request
-	resp     *http.Response
-	fcgiConn net.Conn // fcgi的连接
-	RootDir  string   // 根目录地址
+	Index      int
+	sockAdrr   string        // fastcgi应用程序的socket地址
+	Context    *http.Context // handler的context
+	req        *http.Request
+	resp       *http.Response
+	fcgiConn   net.Conn // fcgi的连接
+	RootDir    string   // 根目录地址
+	RequestID  uint16   // 请求id，这里现在因为只有一个连接，所以使用自增的做法
+	finishChan chan bool
 }
 
 func (fcgi *FastCGI) commonHeaders() {
@@ -32,6 +34,8 @@ func (fcgi *FastCGI) New(site *config.Site, context *http.Context) {
 	fcgi.sockAdrr = site.FCGIPass
 	fcgi.Context = context
 	fcgi.RootDir = site.Root
+	fcgi.RequestID = 1
+	fcgi.finishChan = make(chan bool)
 }
 
 // Start 方法是FastCGI在服务启动时调用的方法
@@ -47,8 +51,6 @@ func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 	fcgi.req = req
 	fcgi.resp = resp
 
-	var finishChan chan bool
-
 	// 建立连接
 	if fcgi.fcgiConn == nil {
 		// 连接不存在,创建连接
@@ -60,14 +62,18 @@ func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 			return
 		}
 
-		finishChan = make(chan bool)
+		log.Println("新建的fcgi连接")
 
-		go fcgi.readHandler(finishChan)
+		go fcgi.readHandler()
 	}
 
+	currentID := fcgi.RequestID
+	log.Printf("请求ID:%v\n", currentID)
+	fcgi.RequestID++
 	// 1.创建并发送开始请求
 	var beginRequestRecord FCGIBeginRequestRecord
-	beginRequestRecord.New(1, FCGIResponder)
+	beginRequestRecord.New(currentID, FCGIResponder)
+
 	fcgi.sendRecord(&beginRequestRecord)
 
 	// 2.获取当前请求的请求头，将其传递给fastcgi 程序
@@ -83,10 +89,15 @@ func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 	}
 
 	params["SCRIPT_FILENAME"] = filepath
-	params["QUERY_STRING"] = "a=123?b=345"
+	params["QUERY_STRING"] = req.QueryString
 	params["REQUEST_METHOD"] = req.Method
 	params["CONTENT_TYPE"] = req.Headers["content-type"]
-	params["CONTENT_LENGTH"] = req.Headers["content-length"]
+
+	if contentLength, ok := req.Headers["content-length"]; !ok {
+		params["CONTENT_LENGTH"] = "0"
+	} else {
+		params["CONTENT_LENGTH"] = contentLength
+	}
 	params["SCRIPT_NAME"] = req.URI
 	params["REQUEST_URI"] = req.URI
 	params["DOCUMENT_URI"] = req.URI
@@ -101,22 +112,30 @@ func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 	params["SERVER_NAME"] = "jiang"
 	// params["HTTP_ACCEPT"] =
 
-	paramsRecord.New(1, params)
+	paramsRecord.New(currentID, params)
 	fcgi.sendRecord(&paramsRecord)
 
-	// 3.创建并发送stdin请求
-	var stdinRecord FCGIStdioRecord
-	stdinRecord.New(1, []byte("a=hello&b=world"))
-	fcgi.sendRecord(&stdinRecord)
-	var emptyStdinRecord FCGIStdioRecord
-	emptyStdinRecord.New(1, []byte(""))
-	fcgi.sendRecord(&emptyStdinRecord)
+	var emptyParamsRecord FCGIParamsRecord
+	emptyParams := make(map[string]string)
+	emptyParamsRecord.New(currentID, emptyParams)
+	fcgi.sendRecord(&emptyParamsRecord)
 
-	fcgi.resp.Headers["content-type"] = "text/html"
+	// 3.创建并发送stdin请求
+	var stdinRecord FCGIStdinRecord
+	log.Printf("请求体的内容:%s", req.Body)
+	stdinRecord.New(currentID, req.Body)
+	fcgi.sendRecord(&stdinRecord)
+
+	if len(req.Body) != 0 {
+		var emptyStdinRecord FCGIStdinRecord
+		emptyBytes := make([]byte, 0)
+		emptyStdinRecord.New(currentID, emptyBytes)
+		fcgi.sendRecord(&emptyStdinRecord)
+	}
 
 	// 这里应该阻塞起来等待fastcgi程序响应
 
-	<-finishChan // 使用管道阻塞
+	<-fcgi.finishChan // 使用管道阻塞
 
 	log.Println("阻塞结束")
 	fcgi.commonHeaders()
@@ -142,12 +161,16 @@ func (fcgi *FastCGI) GetContainer() string {
 // sendRecord 发送FastCGI 记录
 func (fcgi *FastCGI) sendRecord(record Record) {
 	// 通过fcgiConn发送记录
-	fcgi.fcgiConn.Write(record.ToBlob())
+	_, err := fcgi.fcgiConn.Write(record.ToBlob())
+
+	if err != nil {
+		log.Printf("fcgi 写入错误: %v\n", err)
+	}
 
 }
 
 // readHandler 负责从FastCGI应用程序中读取stdout,stderr,以及EndRequestRecord
-func (fcgi *FastCGI) readHandler(finishChan chan bool) {
+func (fcgi *FastCGI) readHandler() {
 	var header FCGIHeader
 	readLen := 8 // 下一次要读取的长度
 	isHeader := true
@@ -157,8 +180,10 @@ func (fcgi *FastCGI) readHandler(finishChan chan bool) {
 		n, err := fcgi.fcgiConn.Read(data[:])
 
 		if err != nil {
+			fcgi.fcgiConn.Close() // 读取出错，可能是对方已经关闭了写通道,直接关闭连接
+			fcgi.fcgiConn = nil   // 置为空
+			fcgi.RequestID = 1
 			log.Println("error when read data from FastCGI Application", err.Error())
-			fcgi.fcgiConn = nil
 			return
 		}
 
@@ -168,7 +193,7 @@ func (fcgi *FastCGI) readHandler(finishChan chan bool) {
 
 		// 打印出n的数据
 
-		log.Printf("读取到长度为%d的数据：%v:%s", n, data[0:n], string(data[0:n]))
+		log.Printf("读取到长度为%d的数据：%s", n, string(data[0:n]))
 
 		if isHeader {
 			header.New(data[0:readLen]) // 初始化header
@@ -187,9 +212,9 @@ func (fcgi *FastCGI) readHandler(finishChan chan bool) {
 
 				if stdoutHeader {
 					if fcgi.resp.Body != nil {
-						fcgi.resp.Body = append(fcgi.resp.Body, outdata[:]...)
+						fcgi.resp.Body = append(fcgi.resp.Body, outdata[:header.ContentLength]...)
 					} else {
-						fcgi.resp.Body = outdata[:]
+						fcgi.resp.Body = outdata[:header.ContentLength]
 					}
 				} else {
 					for i, v := range outdata {
@@ -226,9 +251,9 @@ func (fcgi *FastCGI) readHandler(finishChan chan bool) {
 									stdoutHeader = true
 									// 头部解析完毕
 									if fcgi.resp.Body != nil {
-										fcgi.resp.Body = append(fcgi.resp.Body, outdata[i+1:]...)
+										fcgi.resp.Body = append(fcgi.resp.Body, outdata[i+1:header.ContentLength]...)
 									} else {
-										fcgi.resp.Body = outdata[i+1:]
+										fcgi.resp.Body = outdata[i+1 : header.ContentLength]
 									}
 
 									isFinish = true
@@ -251,12 +276,14 @@ func (fcgi *FastCGI) readHandler(finishChan chan bool) {
 				break
 
 			case FCGIStderr: // 错误输出流
-
+				log.Printf("读取到错误流:%s\n", string(data[0:header.ContentLength]))
 				break
 
 			case FCGIEndRequest: // 结束请求
+				log.Printf("protocal status: %v\n", data[4])
 				stdoutHeader = false
-				finishChan <- true // 释放阻塞
+				log.Println("释放阻塞")
+				fcgi.finishChan <- true // 释放阻塞
 				break
 			}
 
