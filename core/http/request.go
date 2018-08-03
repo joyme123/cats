@@ -7,12 +7,13 @@ import (
 
 // header field一律小写存储
 type Request struct {
-	Method  string
-	URI     string
-	Version string
-	Headers map[string]string
-	Body    []byte
-	Context map[string]interface{}
+	Method      string
+	URI         string
+	Version     string
+	Headers     map[string]string
+	Body        []byte
+	Context     map[string]interface{}
+	QueryString string // GET请求的QueryString
 }
 
 func (req *Request) logger(out io.Writer) {
@@ -25,4 +26,6 @@ func (req *Request) loggerBody(out io.Writer) {
 
 func (req *Request) Clear() {
 	req.Headers = make(map[string]string)
+	req.QueryString = ""
+	req.Body = make([]byte, 0)
 }

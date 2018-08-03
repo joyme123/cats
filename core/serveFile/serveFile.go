@@ -3,12 +3,10 @@ package serveFile
 import (
 	"io/ioutil"
 	"log"
-	"net/url"
-	"os"
-	"strings"
 
 	"github.com/joyme123/cats/config"
 	"github.com/joyme123/cats/core/http"
+	"github.com/joyme123/cats/utils"
 )
 
 type ServeFile struct {
@@ -50,37 +48,16 @@ func (serverFile *ServeFile) Serve(req *http.Request, resp *http.Response) {
 	serverFile.resp = resp
 
 	var filepath string
-	if strings.HasPrefix(req.URI, "http") {
-		u, err := url.Parse(req.URI)
-		if err != nil {
-			resp.Error400()
-			return
-		} else {
-			filepath = u.Path
-		}
+
+	if indexFiles, ok := serverFile.Context.KeyValue["IndexFiles"]; ok {
+		filepath = utils.GetAbsolutePath(serverFile.RootDir, req.URI, indexFiles.([]string))
 	} else {
-		filepath = req.URI
+		filepath = utils.GetAbsolutePath(serverFile.RootDir, req.URI, make([]string, 0, 0))
 	}
 
-	filepath = serverFile.RootDir + filepath
-
-	// 文件夹结尾,自动加上index文件
-	if strings.HasSuffix(filepath, "/") {
-
-		if indexFiles, ok := serverFile.Context.KeyValue["IndexFiles"]; ok {
-			for _, v := range indexFiles.([]string) {
-				_, err := os.Stat(filepath + v)
-				if err == nil {
-					// 文件存在
-					filepath = filepath + v
-					break
-				}
-			}
-		} else {
-			// 默认为index.html
-			filepath = filepath + "index.html"
-		}
-
+	if filepath == "400" {
+		resp.Error400()
+		return
 	}
 
 	serverFile.req.Context["FilePath"] = filepath
@@ -97,4 +74,8 @@ func (serverFile *ServeFile) Shutdown() {
 func (serverFile *ServeFile) GetIndex() int {
 
 	return serverFile.Index
+}
+
+func (serverFile *ServeFile) GetContainer() string {
+	return "location"
 }

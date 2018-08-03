@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"strconv"
+	"strings"
 )
 
 type Response struct {
@@ -24,11 +25,13 @@ func (resp *Response) Init(writer io.Writer) {
 
 // 向Response中添加响应头
 func (resp *Response) AppendHeader(k string, v string) {
-	resp.Headers[k] = v
+	resp.Headers[strings.ToLower(k)] = v
 }
 
 // 将响应转为字符串
 func (resp *Response) toBytes() []byte {
+
+	// log.Printf("response body的为:%v,%s", len(resp.Body), string(resp.Body))
 	var buf bytes.Buffer
 	startLine := fmt.Sprintf("%v %v %v\r\n", resp.Version, resp.StatusCode, resp.Desc)
 	buf.WriteString(startLine)
@@ -67,4 +70,5 @@ func (resp *Response) out() {
 // 清空状态
 func (resp *Response) Clear() {
 	resp.Headers = make(map[string]string)
+	resp.Body = nil
 }

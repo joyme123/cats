@@ -22,4 +22,7 @@ type Component interface {
 
 	// 获取index, index的作用是指定插件的执行顺序
 	GetIndex() int
+
+	// 获取组件的寄主身份，比如Index,Mime组件应该是属于vhost的，而serveFile和fastcgi是属于location
+	GetContainer() string
 }

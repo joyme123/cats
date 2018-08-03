@@ -134,11 +134,11 @@ func (handler *Handler) Parse() {
 	var buf bytes.Buffer
 	var k string // header 的name,不区分大小写,这里统一转换为小写
 	var v string // header 的值,区分大小写
-	var last byte
 
-	bodyLen := 0
+	bodyLen := 0 // 要从流中读取的request body的长度
 	offset := 0
 
+	var last byte
 	firstline := true         //是否在匹配第一行
 	endline := false          //是否匹配完一行
 	kend := false             //当前行是否已经匹配到: 了
@@ -155,19 +155,20 @@ func (handler *Handler) Parse() {
 
 		if bodyLen > 0 {
 			if bodyLen > n {
-				req.Body = append(req.Body, in[0:n-1]...)
+				req.Body = append(req.Body, in[0:n]...)
 				bodyLen -= n
 				offset = n
 			} else {
 				req.Body = append(req.Body, in[0:bodyLen]...) // body解析结束
-				bodyLen = 0
 				offset = bodyLen
 				firstline = true //是否在匹配第一行
 				endline = false  //是否匹配完一行
 				kend = false     //当前行是否已经匹配到: 了
 				info = make([]string, 0)
-
+				bodyLen = 0
+				last = 0
 				handler.serverVh()
+
 			}
 
 		}
@@ -183,8 +184,22 @@ func (handler *Handler) Parse() {
 						return
 					}
 					req.Method = info[0]
-					req.URI = info[1]
+					// 如果Method是Get，需要切割出QueryString
+					if req.Method == "GET" {
+						uriAndQuery := strings.SplitN(info[1], "?", 2) // 最多切割两个子串
+						if len(uriAndQuery) == 2 {
+							req.URI = uriAndQuery[0]
+							req.QueryString = uriAndQuery[1]
+						} else {
+							req.URI = uriAndQuery[0]
+						}
+
+					} else {
+						req.URI = info[1]
+					}
 					req.Version = buf.String()
+
+					info = make([]string, 0) // 重置info
 					buf.Reset()
 				} else {
 
@@ -205,31 +220,55 @@ func (handler *Handler) Parse() {
 
 							// 找到header中的Content-Length
 							// log.Printf("header %v", req.Headers)
-							bodyLen, err = strconv.Atoi(req.Headers["content-length"])
-							if err != nil {
-								// TODO:这个地方应该调用response进行输出
-								// log.Fatal("err content length")
+
+							// 先判断有没有content-length
+							if contentLength, ok := req.Headers["content-length"]; ok {
+								bodyLen, err = strconv.Atoi(contentLength)
+								if err != nil {
+									// TODO:这个地方应该调用response进行输出
+									log.Println("err parse content length")
+									bodyLen = 0
+								}
+							} else {
 								bodyLen = 0
+								req.Headers["content-length"] = "0"
 							}
 
 							if bodyLen > 0 {
 
-								if bodyLen+index <= n {
-									req.Body = append(req.Body, in[index+1:index+bodyLen]...) //构造body结束
-									bodyLen = 0
+								if bodyLen+index <= n { // 当前数据流有包含body的所有内容
+									req.Body = append(req.Body, in[index+1:index+bodyLen+1]...) //构造body结束
 
 									handler.serverVh()
+
+									// 将index移动BodyLen位
+									index = index + bodyLen
+									bodyLen = 0
+
+									// 重置状态机
+									firstline = true //是否在匹配第一行
+									endline = false  //是否匹配完一行
+									kend = false     //当前行是否已经匹配到: 了
+									info = make([]string, 0)
+									last = 0
+									offset = 0
 								} else {
 									req.Body = append(req.Body, in[index+1:n]...) //构造body还没结束,但是in中的输入已经结束了
 									bodyLen = bodyLen - (n - index - 1)
+
+									index = n - 1 // 移动到流的末尾
 								}
 							} else {
 								handler.serverVh()
+								// 重置状态机
+								firstline = true //是否在匹配第一行
+								endline = false  //是否匹配完一行
+								kend = false     //当前行是否已经匹配到: 了
+								info = make([]string, 0)
+								last = 0
+								offset = 0
 							}
-							firstline = true //是否在匹配第一行
-							endline = false  //是否匹配完一行
-							kend = false     //当前行是否已经匹配到: 了
-							info = make([]string, 0)
+
 						} else {
 							endline = true
 							kend = false
@@ -268,11 +307,19 @@ func (handler *Handler) Parse() {
 				last = c
 				endline = false
 			}
+
 		} // end for state machine
+
+		// offset 置为0
+		offset = 0
+
 	}
 }
 
 func (handler *Handler) serverVh() {
+
+	log.Println("---------------------------处理开始------------------------------")
+
 	// 整个请求已经解析结束，调用Process去处理
 	vh := handler.srv.findHost(handler.Request.Headers["host"])
 	if vh != nil {
@@ -281,6 +328,8 @@ func (handler *Handler) serverVh() {
 		// TODO: 这里如果请求的vhost不存在，要接输出错误页面
 		log.Println("无对应serverName的服务")
 	}
+
+	log.Println("---------------------------处理结束------------------------------")
 }
 
 func (handler *Handler) close() {
