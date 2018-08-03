@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -188,14 +189,30 @@ func (handler *Handler) Parse() {
 					if req.Method == "GET" {
 						uriAndQuery := strings.SplitN(info[1], "?", 2) // 最多切割两个子串
 						if len(uriAndQuery) == 2 {
-							req.URI = uriAndQuery[0]
+							url, err := url.QueryUnescape(uriAndQuery[0])
+							if err != nil {
+								req.URI = uriAndQuery[0]
+							} else {
+								req.URI = url
+							}
+
 							req.QueryString = uriAndQuery[1]
 						} else {
-							req.URI = uriAndQuery[0]
+							url, err := url.QueryUnescape(uriAndQuery[0])
+							if err != nil {
+								req.URI = uriAndQuery[0]
+							} else {
+								req.URI = url
+							}
 						}
 
 					} else {
-						req.URI = info[1]
+						url, err := url.QueryUnescape(info[1])
+						if err != nil {
+							req.URI = info[1]
+						} else {
+							req.URI = url
+						}
 					}
 					req.Version = buf.String()
 
