@@ -75,7 +75,7 @@ func main() {
 		ServerName: "mysite.com",
 		Root:       "/home/jiang/projects/test-web",
 		Index:      []string{"index.php", "index.html"},
-		FCGIPass:   "127.0.0.1:9000"}
+		FCGIPass:   "127.0.0.1:9001"}
 
 	var site2 config.Site
 

@@ -14,6 +14,7 @@ type Request struct {
 	Body        []byte
 	Context     map[string]interface{}
 	QueryString string // GET请求的QueryString
+	RemoteAddr  string
 }
 
 func (req *Request) logger(out io.Writer) {

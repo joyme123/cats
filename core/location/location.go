@@ -12,20 +12,17 @@ import (
 
 // Location 组件
 type Location struct {
-	Index   int
-	Context *http.Context // handler的context
-	req     *http.Request
-	resp    *http.Response
-
-	exactMatch        []Pattern // 通用匹配
-	firstPrefixMatch  []Pattern // 在正则匹配前的前缀匹配
-	regexMatch        []Pattern // 正则匹配
-	secondPrefixMatch []Pattern // 在正则匹配后的前缀匹配
-	defaultMatch      Pattern   // 通用匹配
+	Index             int
+	Context           *http.VhostContext // vhost的context
+	exactMatch        []Pattern          // 通用匹配
+	firstPrefixMatch  []Pattern          // 在正则匹配前的前缀匹配
+	regexMatch        []Pattern          // 正则匹配
+	secondPrefixMatch []Pattern          // 在正则匹配后的前缀匹配
+	defaultMatch      Pattern            // 通用匹配
 }
 
 // New 方法是FastCGI 的实例化
-func (loc *Location) New(site *config.Site, context *http.Context) {
+func (loc *Location) New(site *config.Site, context *http.VhostContext) {
 	loc.Context = context
 
 	loc.exactMatch = make([]Pattern, 0, 0)
@@ -43,10 +40,6 @@ func (loc *Location) Start() {
 func (loc *Location) Serve(req *http.Request, resp *http.Response) {
 
 	log.Println("location serve")
-
-	loc.req = req
-	loc.resp = resp
-
 	// 依次进行location的匹配
 	for _, pattern := range loc.exactMatch {
 		if pattern.regex == req.URI {

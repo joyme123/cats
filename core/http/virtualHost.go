@@ -7,18 +7,16 @@ import (
 )
 
 type VirtualHost struct {
-	Request  *Request
-	Response *Response
-	hub      Hub
-	context  Context // VirtualHost的上下文环境
+	hub     Hub
+	context VhostContext // VirtualHost的上下文环境
 }
 
 func (vh *VirtualHost) Init() {
 
-	vh.context = Context{make(map[string]interface{})}
+	vh.context = VhostContext{make(map[string]interface{})}
 }
 
-func (vh *VirtualHost) GetContext() *Context {
+func (vh *VirtualHost) GetContext() *VhostContext {
 	return &vh.context
 }
 
@@ -29,27 +27,25 @@ func (vh *VirtualHost) Register(component interface{}) {
 
 // 接过请求和响应的控制权
 func (vh *VirtualHost) ServeHttp(req *Request, resp *Response) {
-	vh.Request = req
-	vh.Response = resp
 
 	// 解析完毕一个请求
 	if config.GetInstance().Log {
-		vh.Request.logger(os.Stdout)
+		req.logger(os.Stdout)
 	}
 
-	vh.Response.Version = vh.Request.Version
+	resp.Version = req.Version
 
 	for _, comp := range vh.hub.container {
-		comp.Serve(vh.Request, vh.Response)
+		comp.Serve(req, resp)
 	}
 
-	vh.Response.out()
+	resp.out()
 
 	// 清空请求和响应的状态
-	vh.clear()
+	vh.clear(req, resp)
 }
 
-func (vh *VirtualHost) clear() {
-	vh.Request.Clear()
-	vh.Response.Clear()
+func (vh *VirtualHost) clear(req *Request, resp *Response) {
+	req.Clear()
+	resp.Clear()
 }

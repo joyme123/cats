@@ -9,12 +9,10 @@ type Index struct {
 	Files      []string
 	Index      int
 	IndexFiles []string
-	Context    *http.Context // handler的context
-	req        *http.Request
-	resp       *http.Response
+	Context    *http.VhostContext // vhost的context
 }
 
-func (index *Index) New(site *config.Site, context *http.Context) {
+func (index *Index) New(site *config.Site, context *http.VhostContext) {
 	index.IndexFiles = site.Index
 	index.Context = context
 	index.Context.KeyValue["IndexFiles"] = index.IndexFiles

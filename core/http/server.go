@@ -11,11 +11,10 @@ import (
 	"github.com/joyme123/cats/config"
 )
 
-// Context , server的context，用来保存一些配置
+// Context , 当前vhost的context，用来保存一些针对于vhost的上下文
 // 全局使用的有:
-// FilePath代表指向的文件路径
 // IndexFiles代表索引的文件
-type Context struct {
+type VhostContext struct {
 	KeyValue map[string]interface{}
 }
 
@@ -115,6 +114,7 @@ func (handler *Handler) Init(conn net.Conn, srv *Server) {
 	handler.Response.Init(conn)
 	handler.conn = conn
 	handler.srv = srv
+	handler.Request.RemoteAddr = conn.RemoteAddr().String()
 }
 
 // Parse 函数用来解析输入流来构造请求头

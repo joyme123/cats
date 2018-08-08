@@ -9,7 +9,7 @@ import (
 type Component interface {
 
 	// 组件初始化,注入VirtualHost的上下文环境
-	New(site *config.Site, context *Context)
+	New(site *config.Site, context *VhostContext)
 
 	// 在服务启动时执行
 	Start()

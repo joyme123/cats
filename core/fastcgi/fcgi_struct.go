@@ -71,6 +71,7 @@ type FCGIBeginRequestRecord struct {
 }
 
 // FCGIKeepConn 是FCGIBeginRequestBody的Flags的取值, 取1保持连接 取0每次请求结束后会释放连接
+// FIXME: 保持连接应该做成可配置
 const FCGIKeepConn = 1
 
 // FCGIBeginRequestBody的Role取值

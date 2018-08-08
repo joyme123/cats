@@ -32,3 +32,41 @@ type Component interface {
 至于Serve方法，则是在每次请求到来的时候被调用，它会被注入Request和Response的指针，用来读取Request和修改Response的内容。比如在mime组件中，mini组件会读取本次Request的文件的后缀，向Response中写入对应的content-type头。
 
 GetIndex目前是用来指定组件的执行顺序。通过GetIndex为每个组件排好序，在每一次请求到来时，会按照这个顺序来依次启动组件。
+
+
+## 数据同步问题
+
+需要注意的是，一个组件在一个vhost中只有一个对象。因此所有的属于该vhost的请求都是同一个对象去处理的。那么这里就要考虑一个同步的问题：
+
+如果此时有两个请求`R1`, `R2`同时被一个组件对象`C1`处理,有以下代码执行：
+
+对于R1请求(处于goroutine1中):
+```
+C1.a = "10"
+
+// some other code
+
+if (C1.a == "10") {
+	resp.StatusCode == 200
+} else {
+	resp.StatusCode == 503
+}
+```
+
+对于R2请求(处于goroutine2中):
+
+```
+C1.a = "11"
+
+// some other code
+
+if (C1.a == "11") {
+	resp.StatusCode == 200
+} else {
+	resp.StatusCode == 503
+}
+```
+
+这样对于两个同时在运行的goroutine，就是造成数据CAS错误的问题。因此，任何组件的代码中，只要是针对于当前请求的功能，都不允许通过修改当前组件的某些属性来达成目标。我在这里一开始犯得错误就是让组件对象持有当前请求的Request和Response对象，导致在并发请求的时候结果错误。
+
+如果需要，可以使用Request中的Context来获取或修改当前请求的上下文。

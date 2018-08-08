@@ -9,13 +9,11 @@ import (
 
 type Mime struct {
 	mimes   map[string]string
-	Context *http.Context
-	req     *http.Request
-	resp    *http.Response
+	Context *http.VhostContext
 	Index   int
 }
 
-func (mime *Mime) New(site *config.Site, context *http.Context) {
+func (mime *Mime) New(site *config.Site, context *http.VhostContext) {
 	mime.mimes = make(map[string]string)
 
 	// RFC https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Complete_list_of_MIME_types
@@ -86,25 +84,28 @@ func (mime *Mime) Start() {
 }
 
 func (mime *Mime) Serve(req *http.Request, resp *http.Response) {
-	mime.req = req
-	mime.resp = resp
-	ctype, haveType := mime.resp.Headers["content-type"]
+	ctype, haveType := resp.Headers["content-type"]
 
 	if !haveType {
-		filepath := mime.req.Context["FilePath"].(string)
-		lastIndex := strings.LastIndex(filepath, ".")
+		filepath, haveFilePath := req.Context["FilePath"].(string)
 
-		if lastIndex > 0 {
+		if haveFilePath { // 是否有文件路径
+			lastIndex := strings.LastIndex(filepath, ".")
 
-			var ok bool
-			if ctype, ok = mime.mimes[string([]byte(filepath)[lastIndex+1:])]; !ok {
+			if lastIndex > 0 {
 
+				var ok bool
+				if ctype, ok = mime.mimes[string([]byte(filepath)[lastIndex+1:])]; !ok {
+
+					ctype = "text/plain"
+				}
+			} else {
 				ctype = "text/plain"
 			}
+			resp.Headers["content-type"] = ctype
 		} else {
-			ctype = "text/plain"
+			resp.Headers["content-type"] = "text/html"
 		}
-		mime.resp.Headers["content-type"] = ctype
 	}
 }
 

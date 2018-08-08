@@ -12,25 +12,23 @@ import (
 type ServeFile struct {
 	RootDir string
 	Index   int
-	Context *http.Context
-	req     *http.Request
-	resp    *http.Response
+	Context *http.VhostContext
 }
 
-func (serverFile *ServeFile) New(site *config.Site, context *http.Context) {
+func (serverFile *ServeFile) New(site *config.Site, context *http.VhostContext) {
 	serverFile.RootDir = site.Root
 	serverFile.Context = context
 }
 
-func (serverFile *ServeFile) serveFile(filepath string) {
+func (serverFile *ServeFile) serveFile(filepath string, req *http.Request, resp *http.Response) {
 
 	var fileerr error
-	serverFile.resp.Body, fileerr = ioutil.ReadFile(filepath)
+	resp.Body, fileerr = ioutil.ReadFile(filepath)
 	if fileerr != nil {
-		serverFile.resp.Error404()
+		resp.Error404()
 	} else {
-		serverFile.resp.StatusCode = 200
-		serverFile.resp.Desc = "OK"
+		resp.StatusCode = 200
+		resp.Desc = "OK"
 	}
 }
 
@@ -38,15 +36,12 @@ func (serverFile *ServeFile) Start() {
 
 }
 
-func (serverFile *ServeFile) commonHeaders() {
-	serverFile.resp.AppendHeader("connection", "keep-alive")
-	serverFile.resp.AppendHeader("server", "cats")
+func (serverFile *ServeFile) commonHeaders(resp *http.Response) {
+	resp.AppendHeader("connection", "keep-alive")
+	resp.AppendHeader("server", "cats")
 }
 
 func (serverFile *ServeFile) Serve(req *http.Request, resp *http.Response) {
-	serverFile.req = req
-	serverFile.resp = resp
-
 	var filepath string
 
 	if indexFiles, ok := serverFile.Context.KeyValue["IndexFiles"]; ok {
@@ -60,11 +55,11 @@ func (serverFile *ServeFile) Serve(req *http.Request, resp *http.Response) {
 		return
 	}
 
-	serverFile.req.Context["FilePath"] = filepath
+	req.Context["FilePath"] = filepath
 
 	log.Println("server file:", filepath)
-	serverFile.commonHeaders()
-	serverFile.serveFile(filepath)
+	serverFile.commonHeaders(resp)
+	serverFile.serveFile(filepath, req, resp)
 }
 
 func (serverFile *ServeFile) Shutdown() {
