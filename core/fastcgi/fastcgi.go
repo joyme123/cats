@@ -11,7 +11,6 @@ import (
 
 	"github.com/joyme123/cats/config"
 	"github.com/joyme123/cats/core/http"
-	"github.com/joyme123/cats/utils"
 )
 
 // FastCGI 的结构体
@@ -70,6 +69,10 @@ func (fcgi *FastCGI) Start() {
 // Serve 方法是FastCGI在有请求到来时被调用的方法
 func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 
+	if resp.StatusCode != 0 {
+		return
+	}
+
 	finishChan := make(chan bool)
 
 	// 建立连接
@@ -98,108 +101,118 @@ func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 	var params map[string]string
 	params = make(map[string]string)
 
-	var filepath string // 脚本文件的绝对路径
-	if indexFiles, ok := fcgi.Context.KeyValue["IndexFiles"]; ok {
-		filepath = utils.GetAbsolutePath(fcgi.RootDir, req.URI, indexFiles.([]string))
+	filepath, ok := req.Context["FilePath"]
+
+	if !ok {
+		log.Println("serve file error: not found filepath in request context")
+		resp.Error404()
+		return
+	}
+
+	if filepathStr, ok := filepath.(string); ok {
+
+		params["SCRIPT_FILENAME"] = filepathStr
+		params["QUERY_STRING"] = req.QueryString
+		params["REQUEST_METHOD"] = req.Method
+		params["SCRIPT_NAME"] = req.URI
+		params["REQUEST_URI"] = req.URI
+		params["DOCUMENT_URI"] = req.URI
+		params["DOCUMENT_ROOT"] = fcgi.RootDir
+		params["SERVER_PROTOCOL"] = req.Version
+		params["GATEWAY_INTERFACE"] = "CGI/1.1"
+		params["SERVER_SOFTWARE"] = "cats"
+
+		remoteAddr := strings.Split(req.RemoteAddr, ":")
+
+		params["REMOTE_ADDR"] = remoteAddr[0]
+		params["REMOTE_PORT"] = remoteAddr[1]
+		params["SERVER_ADDR"] = fcgi.serverAddr
+		params["SERVER_PORT"] = strconv.Itoa(fcgi.serverPort)
+		params["SERVER_NAME"] = fcgi.serverName
+
+		if accept, ok := req.Headers["accept"]; ok {
+			params["HTTP_ACCEPT"] = accept
+		}
+
+		if acceptLang, ok := req.Headers["accept-language"]; ok {
+			params["HTTP_ACCEPT_LANGUAGE"] = acceptLang
+		}
+
+		if acceptEnc, ok := req.Headers["accept-encoding"]; ok {
+			params["HTTP_ACCEPT_ENCODING"] = acceptEnc
+		}
+
+		if userAgent, ok := req.Headers["user-agent"]; ok {
+			params["HTTP_USER_AGENT"] = userAgent
+		}
+
+		if host, ok := req.Headers["host"]; ok {
+			params["HTTP_HOST"] = host
+		}
+
+		if connection, ok := req.Headers["connection"]; ok {
+			params["HTTP_CONNECTION"] = connection
+		}
+
+		if contentType, ok := req.Headers["content-type"]; ok {
+			params["HTTP_CONTENT_TYPE"] = contentType
+			params["CONTENT_TYPE"] = contentType
+		}
+
+		if contentLength, ok := req.Headers["content-length"]; !ok {
+			params["CONTENT_LENGTH"] = "0"
+			params["HTTP_CONTENT_LENGTH"] = "0"
+		} else {
+			params["CONTENT_LENGTH"] = contentLength
+			params["HTTP_CONTENT_LENGTH"] = contentLength
+		}
+
+		if cacheCtrl, ok := req.Headers["cache-control"]; ok {
+			params["HTTP_CACHE_CONTROL"] = cacheCtrl
+		}
+
+		if cookie, ok := req.Headers["cookie"]; ok {
+			params["HTTP_COOKIE"] = cookie
+		}
+
+		paramsRecord.New(currentID, params)
+		fcgi.sendRecord(conn, &paramsRecord)
+
+		var emptyParamsRecord FCGIParamsRecord
+		emptyParams := make(map[string]string)
+		emptyParamsRecord.New(currentID, emptyParams)
+		fcgi.sendRecord(conn, &emptyParamsRecord)
+
+		// 3.创建并发送stdin请求
+		var stdinRecord FCGIStdinRecord
+		log.Printf("请求体的内容:%s", req.Body)
+		stdinRecord.New(currentID, req.Body)
+		fcgi.sendRecord(conn, &stdinRecord)
+
+		if len(req.Body) != 0 {
+			var emptyStdinRecord FCGIStdinRecord
+			emptyBytes := make([]byte, 0)
+			emptyStdinRecord.New(currentID, emptyBytes)
+			fcgi.sendRecord(conn, &emptyStdinRecord)
+
+			fcgi.sendRecord(conn, &emptyStdinRecord)
+		}
+
+		// 这里应该阻塞起来等待fastcgi程序响应
+
+		<-finishChan // 使用管道阻塞
+		conn.Close()
+		log.Println("阻塞结束")
+		fcgi.commonHeaders(resp)
+
+		if resp.StatusCode == 0 {
+			resp.StatusCode = 200
+			resp.Desc = "OK"
+		}
 	} else {
-		filepath = utils.GetAbsolutePath(fcgi.RootDir, req.URI, make([]string, 0, 0))
+		resp.Error404()
 	}
 
-	params["SCRIPT_FILENAME"] = filepath
-	params["QUERY_STRING"] = req.QueryString
-	params["REQUEST_METHOD"] = req.Method
-	params["SCRIPT_NAME"] = req.URI
-	params["REQUEST_URI"] = req.URI
-	params["DOCUMENT_URI"] = req.URI
-	params["DOCUMENT_ROOT"] = fcgi.RootDir
-	params["SERVER_PROTOCOL"] = req.Version
-	params["GATEWAY_INTERFACE"] = "CGI/1.1"
-	params["SERVER_SOFTWARE"] = "cats"
-
-	remoteAddr := strings.Split(req.RemoteAddr, ":")
-
-	params["REMOTE_ADDR"] = remoteAddr[0]
-	params["REMOTE_PORT"] = remoteAddr[1]
-	params["SERVER_ADDR"] = fcgi.serverAddr
-	params["SERVER_PORT"] = strconv.Itoa(fcgi.serverPort)
-	params["SERVER_NAME"] = fcgi.serverName
-
-	if accept, ok := req.Headers["accept"]; ok {
-		params["HTTP_ACCEPT"] = accept
-	}
-
-	if acceptLang, ok := req.Headers["accept-language"]; ok {
-		params["HTTP_ACCEPT_LANGUAGE"] = acceptLang
-	}
-
-	if acceptEnc, ok := req.Headers["accept-encoding"]; ok {
-		params["HTTP_ACCEPT_ENCODING"] = acceptEnc
-	}
-
-	if userAgent, ok := req.Headers["user-agent"]; ok {
-		params["HTTP_USER_AGENT"] = userAgent
-	}
-
-	if host, ok := req.Headers["host"]; ok {
-		params["HTTP_HOST"] = host
-	}
-
-	if connection, ok := req.Headers["connection"]; ok {
-		params["HTTP_CONNECTION"] = connection
-	}
-
-	if contentType, ok := req.Headers["content-type"]; ok {
-		params["HTTP_CONTENT_TYPE"] = contentType
-		params["CONTENT_TYPE"] = contentType
-	}
-
-	if contentLength, ok := req.Headers["content-length"]; !ok {
-		params["CONTENT_LENGTH"] = "0"
-		params["HTTP_CONTENT_LENGTH"] = "0"
-	} else {
-		params["CONTENT_LENGTH"] = contentLength
-		params["HTTP_CONTENT_LENGTH"] = contentLength
-	}
-
-	if cacheCtrl, ok := req.Headers["cache-control"]; ok {
-		params["HTTP_CACHE_CONTROL"] = cacheCtrl
-	}
-
-	if cookie, ok := req.Headers["cookie"]; ok {
-		params["HTTP_COOKIE"] = cookie
-	}
-
-	paramsRecord.New(currentID, params)
-	fcgi.sendRecord(conn, &paramsRecord)
-
-	var emptyParamsRecord FCGIParamsRecord
-	emptyParams := make(map[string]string)
-	emptyParamsRecord.New(currentID, emptyParams)
-	fcgi.sendRecord(conn, &emptyParamsRecord)
-
-	// 3.创建并发送stdin请求
-	var stdinRecord FCGIStdinRecord
-	log.Printf("请求体的内容:%s", req.Body)
-	stdinRecord.New(currentID, req.Body)
-	fcgi.sendRecord(conn, &stdinRecord)
-
-	if len(req.Body) != 0 {
-		var emptyStdinRecord FCGIStdinRecord
-		emptyBytes := make([]byte, 0)
-		emptyStdinRecord.New(currentID, emptyBytes)
-		fcgi.sendRecord(conn, &emptyStdinRecord)
-
-		fcgi.sendRecord(conn, &emptyStdinRecord)
-	}
-
-	// 这里应该阻塞起来等待fastcgi程序响应
-
-	<-finishChan // 使用管道阻塞
-	conn.Close()
-	log.Println("阻塞结束")
-	fcgi.commonHeaders(resp)
-	resp.StatusCode = 200
-	resp.Desc = "OK"
 }
 
 // Shutdown 方法是FastCGI在服务终止时被调用的方法
@@ -339,10 +352,16 @@ func (fcgi *FastCGI) readHandler(conn net.Conn, req *http.Request, resp *http.Re
 								if state == 0 {
 									// 还在解析头部
 									headerStr := string(outdata[start : i-1])
-									resStr := strings.Split(headerStr, ":")
-									if len(resStr) == 2 {
-										if strings.ToLower(resStr[0]) == "status" {
-											statusRes := strings.Split(resStr[1], " ")
+									pos := strings.IndexByte(headerStr, ':')
+									var headerKey string
+									var headerValue string
+									if pos > 0 {
+										headerKey = headerStr[0:pos]
+										headerValue = headerStr[pos+1:]
+									}
+									if headerKey != "" && headerValue != "" {
+										if strings.ToLower(headerKey) == "status" {
+											statusRes := strings.Split(strings.Trim(headerValue, " "), " ")
 
 											statusCode, err := strconv.Atoi(statusRes[0])
 
@@ -354,8 +373,11 @@ func (fcgi *FastCGI) readHandler(conn net.Conn, req *http.Request, resp *http.Re
 											resp.StatusCode = statusCode
 											resp.Desc = statusRes[1]
 										} else {
-											resp.AppendHeader(strings.ToLower(resStr[0]), resStr[1])
+											resp.AppendHeader(strings.ToLower(headerKey), headerValue)
 										}
+
+										headerKey = ""
+										headerValue = ""
 
 									}
 									start = i + 1

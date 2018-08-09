@@ -92,8 +92,9 @@ func main() {
 		Addr:       "127.0.0.1",
 		Port:       8090,
 		ServerName: "mysite2.com",
-		Root:       "/home/jiang/projects/test-web/about",
-		Index:      []string{"index.htm", "index.html"}}
+		Root:       "/var/www/wordpress",
+		FCGIPass:   "127.0.0.1:9001",
+		Index:      []string{"index.php", "index.html"}}
 
 	var conf config.Config
 

@@ -191,34 +191,26 @@ func (handler *Handler) Parse() {
 					}
 					req.Method = info[0]
 					// 如果Method是Get，需要切割出QueryString
-					if req.Method == "GET" {
-						uriAndQuery := strings.SplitN(info[1], "?", 2) // 最多切割两个子串
-						if len(uriAndQuery) == 2 {
-							url, err := url.QueryUnescape(uriAndQuery[0])
-							if err != nil {
-								req.URI = uriAndQuery[0]
-							} else {
-								req.URI = url
-							}
 
-							req.QueryString = uriAndQuery[1]
+					uriAndQuery := strings.SplitN(info[1], "?", 2) // 最多切割两个子串
+					if len(uriAndQuery) == 2 {
+						url, err := url.QueryUnescape(uriAndQuery[0])
+						if err != nil {
+							req.URI = uriAndQuery[0]
 						} else {
-							url, err := url.QueryUnescape(uriAndQuery[0])
-							if err != nil {
-								req.URI = uriAndQuery[0]
-							} else {
-								req.URI = url
-							}
+							req.URI = url
 						}
 
+						req.QueryString = uriAndQuery[1]
 					} else {
-						url, err := url.QueryUnescape(info[1])
+						url, err := url.QueryUnescape(uriAndQuery[0])
 						if err != nil {
-							req.URI = info[1]
+							req.URI = uriAndQuery[0]
 						} else {
 							req.URI = url
 						}
 					}
+
 					req.Version = buf.String()
 
 					info = make([]string, 0) // 重置info

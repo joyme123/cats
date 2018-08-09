@@ -26,7 +26,11 @@ func (req *Request) loggerBody(out io.Writer) {
 }
 
 func (req *Request) Clear() {
+	req.Method = ""
+	req.URI = ""
+	req.Version = ""
 	req.Headers = make(map[string]string)
 	req.QueryString = ""
 	req.Body = make([]byte, 0)
+	req.Context = make(map[string]interface{})
 }

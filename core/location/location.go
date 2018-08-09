@@ -8,6 +8,7 @@ import (
 
 	"github.com/joyme123/cats/config"
 	"github.com/joyme123/cats/core/http"
+	"github.com/joyme123/cats/utils"
 )
 
 // Location 组件
@@ -19,12 +20,13 @@ type Location struct {
 	regexMatch        []Pattern          // 正则匹配
 	secondPrefixMatch []Pattern          // 在正则匹配后的前缀匹配
 	defaultMatch      Pattern            // 通用匹配
+	RootDir           string
 }
 
 // New 方法是FastCGI 的实例化
 func (loc *Location) New(site *config.Site, context *http.VhostContext) {
 	loc.Context = context
-
+	loc.RootDir = site.Root
 	loc.exactMatch = make([]Pattern, 0, 0)
 	loc.firstPrefixMatch = make([]Pattern, 0, 0)
 	loc.regexMatch = make([]Pattern, 0, 0)
@@ -59,9 +61,29 @@ func (loc *Location) Start() {
 func (loc *Location) Serve(req *http.Request, resp *http.Response) {
 
 	log.Println("location serve")
+
+	var filepath string
+	var completeURI string
+
+	if indexFiles, ok := loc.Context.KeyValue["IndexFiles"]; ok {
+		filepath, completeURI = utils.GetAbsolutePath(loc.RootDir, req.URI, indexFiles.([]string))
+	} else {
+		filepath, completeURI = utils.GetAbsolutePath(loc.RootDir, req.URI, make([]string, 0, 0))
+	}
+
+	if filepath == "400" {
+		resp.Error400()
+		return
+	}
+
+	log.Println("uri格式:", completeURI)
+	log.Println("file path", filepath)
+
+	req.Context["FilePath"] = filepath
+
 	// 依次进行location的匹配
 	for _, pattern := range loc.exactMatch {
-		if pattern.regex == req.URI {
+		if pattern.regex == completeURI {
 			// 匹配到
 			pattern.comp.Serve(req, resp)
 			return
@@ -69,7 +91,7 @@ func (loc *Location) Serve(req *http.Request, resp *http.Response) {
 	}
 
 	for _, pattern := range loc.firstPrefixMatch {
-		if strings.HasPrefix(req.URI, pattern.regex) {
+		if strings.HasPrefix(completeURI, pattern.regex) {
 			// 匹配到
 			pattern.comp.Serve(req, resp)
 			return
@@ -85,7 +107,7 @@ func (loc *Location) Serve(req *http.Request, resp *http.Response) {
 			reg = regexp.MustCompile(pattern.regex)
 		}
 
-		if reg.MatchString(req.URI) {
+		if reg.MatchString(completeURI) {
 			// 匹配到
 			pattern.comp.Serve(req, resp)
 			return
@@ -93,7 +115,7 @@ func (loc *Location) Serve(req *http.Request, resp *http.Response) {
 	}
 
 	for _, pattern := range loc.secondPrefixMatch {
-		if strings.HasPrefix(req.URI, pattern.regex) {
+		if strings.HasPrefix(completeURI, pattern.regex) {
 			// 匹配到
 			pattern.comp.Serve(req, resp)
 			return

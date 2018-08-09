@@ -75,6 +75,9 @@ func (resp *Response) out() {
 
 // 清空状态
 func (resp *Response) Clear() {
+	resp.Version = ""
+	resp.StatusCode = 0
+	resp.Desc = ""
 	resp.Headers = make(map[string]string)
 	resp.Body = nil
 }

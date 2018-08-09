@@ -6,17 +6,14 @@ import (
 
 	"github.com/joyme123/cats/config"
 	"github.com/joyme123/cats/core/http"
-	"github.com/joyme123/cats/utils"
 )
 
 type ServeFile struct {
-	RootDir string
 	Index   int
 	Context *http.VhostContext
 }
 
 func (serverFile *ServeFile) New(site *config.Site, context *http.VhostContext) {
-	serverFile.RootDir = site.Root
 	serverFile.Context = context
 }
 
@@ -42,24 +39,28 @@ func (serverFile *ServeFile) commonHeaders(resp *http.Response) {
 }
 
 func (serverFile *ServeFile) Serve(req *http.Request, resp *http.Response) {
-	var filepath string
 
-	if indexFiles, ok := serverFile.Context.KeyValue["IndexFiles"]; ok {
-		filepath = utils.GetAbsolutePath(serverFile.RootDir, req.URI, indexFiles.([]string))
-	} else {
-		filepath = utils.GetAbsolutePath(serverFile.RootDir, req.URI, make([]string, 0, 0))
-	}
-
-	if filepath == "400" {
-		resp.Error400()
+	if resp.StatusCode != 0 {
 		return
 	}
 
-	req.Context["FilePath"] = filepath
+	filepath, ok := req.Context["FilePath"]
 
-	log.Println("server file:", filepath)
-	serverFile.commonHeaders(resp)
-	serverFile.serveFile(filepath, req, resp)
+	if !ok {
+		log.Println("serve file error: not found filepath in request context")
+		resp.Error404()
+		return
+	}
+
+	if str, ok := filepath.(string); ok {
+		log.Println("server file:", filepath)
+		serverFile.commonHeaders(resp)
+		serverFile.serveFile(str, req, resp)
+	} else {
+		resp.Error404()
+		return
+	}
+
 }
 
 func (serverFile *ServeFile) Shutdown() {
