@@ -33,6 +33,25 @@ func (loc *Location) New(site *config.Site, context *http.VhostContext) {
 
 // Start 方法是FastCGI在服务启动时调用的方法
 func (loc *Location) Start() {
+	// 调用所有pattern中的Start
+
+	for _, pattern := range loc.exactMatch {
+		pattern.comp.Start()
+	}
+
+	for _, pattern := range loc.firstPrefixMatch {
+		pattern.comp.Start()
+	}
+
+	for _, pattern := range loc.regexMatch {
+		pattern.comp.Start()
+	}
+
+	for _, pattern := range loc.secondPrefixMatch {
+		pattern.comp.Start()
+	}
+
+	loc.defaultMatch.comp.Start()
 
 }
 

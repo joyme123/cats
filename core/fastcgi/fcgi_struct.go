@@ -72,7 +72,7 @@ type FCGIBeginRequestRecord struct {
 
 // FCGIKeepConn 是FCGIBeginRequestBody的Flags的取值, 取1保持连接 取0每次请求结束后会释放连接
 // FIXME: 保持连接应该做成可配置
-const FCGIKeepConn = 1
+const FCGIKeepConn = 0
 
 // FCGIBeginRequestBody的Role取值
 const (
@@ -159,6 +159,11 @@ type FCGINameValuePair44 struct {
 // FCGIParamsRecord 是 FCGI_PARAMS 记录
 // Params是可以在多个Record中存在的，如果一个Record记录不下，把多出的部分放在下一个Record中即可
 type FCGIParamsRecord struct {
+	Header FCGIHeader
+	Body   []byte // 因为contentLength是16位，所以body的最大长度是65536
+}
+
+type FCGIGetValuesRecord struct {
 	Header FCGIHeader
 	Body   []byte // 因为contentLength是16位，所以body的最大长度是65536
 }
@@ -324,6 +329,89 @@ func (record *FCGIParamsRecord) New(requestID uint16, pair map[string]string) {
 
 // ToBlob 将FCGI_PARAMS转换成二进制流
 func (record *FCGIParamsRecord) ToBlob() []byte {
+	headerBytes := record.Header.ToBlob()
+	bodyBytes := record.Body
+
+	blob := append(headerBytes, bodyBytes...)
+
+	return blob
+}
+
+func (record *FCGIGetValuesRecord) New(pair map[string]string) {
+	record.Header.Version = FCGIVersion1
+	record.Header.Type = FCGIGetValues
+	record.Header.RequestID = 0
+	record.Header.PaddingLength = 0
+
+	bodyBytes := make([]byte, 0, 0)
+
+	// 处理记录的body
+	for key, value := range pair {
+		keyBytes := []byte(key)
+		valueBytes := []byte(value)
+
+		keyLen := len(keyBytes)
+		valueLen := len(valueBytes)
+
+		if keyLen <= 127 {
+			// pair1x
+			if valueLen <= 127 {
+				// pair11
+				var pair11 FCGINameValuePair11
+				pair11.NameLength = uint8(keyLen)
+				pair11.ValueLength = uint8(valueLen)
+				pair11.NameData = []byte(key)
+				pair11.ValueData = []byte(value)
+				bodyBytes = append(bodyBytes, pair11.ToBlob()...)
+			} else {
+				// pair14
+				var pair14 FCGINameValuePair14
+				pair14.NameLength = uint8(keyLen)
+				pair14.ValueLength = uint32(valueLen)
+				pair14.NameData = []byte(key)
+				pair14.ValueData = []byte(value)
+				bodyBytes = append(bodyBytes, pair14.ToBlob()...)
+			}
+		} else {
+			// pair4x
+			if valueLen <= 127 {
+				// pair41
+				var pair41 FCGINameValuePair41
+				pair41.NameLength = uint32(keyLen)
+				pair41.ValueLength = uint8(valueLen)
+				pair41.NameData = []byte(key)
+				pair41.ValueData = []byte(value)
+				bodyBytes = append(bodyBytes, pair41.ToBlob()...)
+			} else {
+				// pair44
+				var pair44 FCGINameValuePair44
+				pair44.NameLength = uint32(keyLen)
+				pair44.ValueLength = uint32(valueLen)
+				pair44.NameData = []byte(key)
+				pair44.ValueData = []byte(value)
+				bodyBytes = append(bodyBytes, pair44.ToBlob()...)
+			}
+		}
+	} // end for keyvalue
+
+	bodyLen := len(bodyBytes)
+
+	// 填充字节，使得记录是8字节对齐的
+	if tail := uint8(bodyLen % 8); tail != 0 {
+		paddingLen := 8 - tail
+		record.Header.PaddingLength = paddingLen
+		paddingBytes := make([]byte, paddingLen, paddingLen)
+		bodyBytes = append(bodyBytes, paddingBytes...)
+	}
+
+	// FIXME: 判断bodyBytes的长度，根据该长度去决定是否生成多条FCGIParamsRecord。
+	// 单条FCGIParamsRecord的ContentLength最多65536
+	record.Body = bodyBytes
+	record.Header.ContentLength = uint16(bodyLen)
+}
+
+// ToBlob 将FCGI_PARAMS转换成二进制流
+func (record *FCGIGetValuesRecord) ToBlob() []byte {
 	headerBytes := record.Header.ToBlob()
 	bodyBytes := record.Body
 

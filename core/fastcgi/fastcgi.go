@@ -1,6 +1,9 @@
 package fastcgi
 
+// 目前的实现中为了简洁没有复用连接
+
 import (
+	"encoding/binary"
 	"log"
 	"net"
 	"strconv"
@@ -16,9 +19,7 @@ type FastCGI struct {
 	Index      int
 	sockAdrr   string             // fastcgi应用程序的socket地址
 	Context    *http.VhostContext // handler的context
-	fcgiConn   net.Conn           // fcgi的连接
-	requestID  uint16
-	RootDir    string // 根目录地址
+	RootDir    string             // 根目录地址
 	serverName string
 	serverAddr string
 	serverPort int
@@ -37,12 +38,33 @@ func (fcgi *FastCGI) New(site *config.Site, context *http.VhostContext) {
 	fcgi.serverName = site.ServerName
 	fcgi.serverAddr = site.Addr
 	fcgi.serverPort = site.Port
-	fcgi.requestID = 1
 }
 
 // Start 方法是FastCGI在服务启动时调用的方法
 func (fcgi *FastCGI) Start() {
+	conn, err := net.Dial("tcp", fcgi.sockAdrr)
+	if err != nil {
+		log.Println("error when connect to FastCGI Application", err.Error())
+		return
+	}
 
+	// 启动时向FCGI应用程序进行查询
+	var getValuesRecord FCGIGetValuesRecord
+	getValues := make(map[string]string)
+	getValues[FCGIMaxConns] = ""
+	getValues[FCGIMaxReqs] = ""
+	getValues[FCGIMpxConns] = ""
+
+	getValuesRecord.New(getValues)
+	fcgi.sendRecord(conn, &getValuesRecord)
+
+	readChan := make(chan bool)
+
+	go fcgi.readManageInfo(conn, readChan)
+
+	<-readChan
+
+	conn.Close()
 }
 
 // Serve 方法是FastCGI在有请求到来时被调用的方法
@@ -51,30 +73,25 @@ func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 	finishChan := make(chan bool)
 
 	// 建立连接
-	if fcgi.fcgiConn == nil {
-		// 连接不存在,创建连接
-		var err error
-		fcgi.fcgiConn, err = net.Dial("tcp", fcgi.sockAdrr)
-		if err != nil {
-			log.Println("error when connect to FastCGI Application", err.Error())
-			fcgi.fcgiConn = nil
-			resp.Error502()
-			return
-		}
-
-		log.Println("新建的fcgi连接")
-
-		go fcgi.readHandler(req, resp, finishChan)
+	conn, err := net.Dial("tcp", fcgi.sockAdrr)
+	if err != nil {
+		log.Println("error when connect to FastCGI Application", err.Error())
+		conn = nil
+		resp.Error502()
+		return
 	}
 
-	currentID := fcgi.requestID
+	log.Println("新建的fcgi连接")
+
+	go fcgi.readHandler(conn, req, resp, finishChan)
+
+	currentID := uint16(1)
 	log.Printf("请求ID:%v\n", currentID)
-	fcgi.requestID++
 	// 1.创建并发送开始请求
 	var beginRequestRecord FCGIBeginRequestRecord
 	beginRequestRecord.New(currentID, FCGIResponder)
 
-	fcgi.sendRecord(&beginRequestRecord)
+	fcgi.sendRecord(conn, &beginRequestRecord)
 
 	// 2.获取当前请求的请求头，将其传递给fastcgi 程序
 	var paramsRecord FCGIParamsRecord
@@ -153,32 +170,32 @@ func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 	}
 
 	paramsRecord.New(currentID, params)
-	fcgi.sendRecord(&paramsRecord)
+	fcgi.sendRecord(conn, &paramsRecord)
 
 	var emptyParamsRecord FCGIParamsRecord
 	emptyParams := make(map[string]string)
 	emptyParamsRecord.New(currentID, emptyParams)
-	fcgi.sendRecord(&emptyParamsRecord)
+	fcgi.sendRecord(conn, &emptyParamsRecord)
 
 	// 3.创建并发送stdin请求
 	var stdinRecord FCGIStdinRecord
 	log.Printf("请求体的内容:%s", req.Body)
 	stdinRecord.New(currentID, req.Body)
-	fcgi.sendRecord(&stdinRecord)
+	fcgi.sendRecord(conn, &stdinRecord)
 
 	if len(req.Body) != 0 {
 		var emptyStdinRecord FCGIStdinRecord
 		emptyBytes := make([]byte, 0)
 		emptyStdinRecord.New(currentID, emptyBytes)
-		fcgi.sendRecord(&emptyStdinRecord)
+		fcgi.sendRecord(conn, &emptyStdinRecord)
 
-		fcgi.sendRecord(&emptyStdinRecord)
+		fcgi.sendRecord(conn, &emptyStdinRecord)
 	}
 
 	// 这里应该阻塞起来等待fastcgi程序响应
 
 	<-finishChan // 使用管道阻塞
-
+	conn.Close()
 	log.Println("阻塞结束")
 	fcgi.commonHeaders(resp)
 	resp.StatusCode = 200
@@ -188,7 +205,6 @@ func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 // Shutdown 方法是FastCGI在服务终止时被调用的方法
 func (fcgi *FastCGI) Shutdown() {
 	log.Println("关闭fastcgi连接")
-	fcgi.fcgiConn.Close()
 }
 
 // GetIndex 用来获取当前组件的索引
@@ -201,10 +217,10 @@ func (fcgi *FastCGI) GetContainer() string {
 }
 
 // sendRecord 发送FastCGI 记录
-func (fcgi *FastCGI) sendRecord(record Record) {
+func (fcgi *FastCGI) sendRecord(conn net.Conn, record Record) {
 
 	// 通过fcgiConn发送记录
-	_, err := fcgi.fcgiConn.Write(record.ToBlob())
+	_, err := conn.Write(record.ToBlob())
 
 	if err != nil {
 		log.Printf("fcgi 写入错误: %v\n", err)
@@ -212,26 +228,80 @@ func (fcgi *FastCGI) sendRecord(record Record) {
 
 }
 
+func (fcgi *FastCGI) readManageInfo(conn net.Conn, readChan chan bool) {
+	var header FCGIHeader
+	readLen := 8
+	isHeader := true
+
+	for {
+		data := make([]byte, readLen, readLen)
+		n, err := conn.Read(data[:])
+
+		if err != nil {
+			log.Println("error when read fcgi manage info", err.Error())
+
+			return
+		}
+
+		if n == 0 {
+			log.Println("没有读取数据")
+			readChan <- true
+			return
+		}
+
+		if isHeader {
+			header.New(data[0:readLen]) // 初始化header
+			isHeader = false
+			readLen = int(header.ContentLength) + int(header.PaddingLength)
+		} else {
+			if header.Type == FCGIGetValueResults {
+
+				pair := fcgi.parseNameValuePair(data, int(header.ContentLength))
+
+				for key, value := range pair {
+					switch key {
+					case FCGIMaxConns: // 最大连接数
+						log.Printf("最大连接数:%v\n", value)
+						break
+
+					case FCGIMaxReqs: // 最多请求数
+						log.Printf("最多请求数:%v\n", value)
+						break
+
+					case FCGIMpxConns: // 是否复用连接,0不复用连接
+						log.Printf("是否复用连接:%v\n", value)
+						break
+					}
+				}
+			} else {
+				log.Println("fcgi应用程序回复错误")
+			}
+
+			readChan <- true
+		}
+	}
+}
+
 // readHandler 负责从FastCGI应用程序中读取stdout,stderr,以及EndRequestRecord
-func (fcgi *FastCGI) readHandler(req *http.Request, resp *http.Response, finishChan chan bool) {
+func (fcgi *FastCGI) readHandler(conn net.Conn, req *http.Request, resp *http.Response, finishChan chan bool) {
 	var header FCGIHeader
 	readLen := 8 // 下一次要读取的长度
 	isHeader := true
 	stdoutHeader := false // 是否解析过标准输出的头信息
 	for {
 		data := make([]byte, readLen, readLen)
-		n, err := fcgi.fcgiConn.Read(data[:])
+		n, err := conn.Read(data[:])
 
 		if err != nil {
-			fcgi.fcgiConn.Close() // 读取出错，可能是对方已经关闭了写通道,直接关闭连接
-			fcgi.fcgiConn = nil   // 置为空
-			fcgi.requestID = 1
 			log.Println("error when read data from FastCGI Application", err.Error())
+			finishChan <- true // 释放阻塞
 			return
 		}
 
 		if n == 0 {
 			log.Println("没有读取数据")
+			finishChan <- true // 释放阻塞
+			return
 		}
 
 		// 打印出n的数据
@@ -324,6 +394,23 @@ func (fcgi *FastCGI) readHandler(req *http.Request, resp *http.Response, finishC
 
 			case FCGIEndRequest: // 结束请求
 				log.Printf("protocal status: %v\n", data[4])
+				switch data[4] {
+				case FCGIRequestComplete:
+					// 正常的请求结束。
+					break
+
+				case FCGICantMpxConn:
+					// 拒绝新请求。当Web服务器通过一个连接将并发请求发送到旨在每个连接一次处理一个请求的应用程序时，就会发生这种情况。
+					break
+
+				case FCGIOverloaded:
+					// 拒绝新请求。当应用程序耗尽某些资源时会发生这种情况，例如：数据库连接。
+					break
+
+				case FCGIUnknownRole:
+					// 拒绝新请求。当Web服务器指定了应用程序未知的角色时，会发生这种情况。
+					break
+				}
 				stdoutHeader = false
 				log.Println("释放阻塞")
 				finishChan <- true // 释放阻塞
@@ -337,4 +424,66 @@ func (fcgi *FastCGI) readHandler(req *http.Request, resp *http.Response, finishC
 		}
 
 	}
+}
+
+func (fcgi *FastCGI) parseNameValuePair(data []byte, len int) map[string]string {
+	pair := make(map[string]string)
+	if len <= 0 {
+		return pair
+	}
+
+	offset := 0
+	var keyLen uint32
+	var valueLen uint32
+
+	for offset < len {
+		if data[offset]>>7 == 0 {
+			keyLen = uint32(data[offset])
+			// keylen一个字节
+			offset = offset + 1
+
+			if data[offset]>>7 == 0 {
+				// valueLen 一个字节
+				valueLen = uint32(data[offset])
+				offset = offset + 1
+			} else {
+				//valueLen 4个字节
+				data[offset] = data[offset] & 0x7f
+				binary.BigEndian.PutUint32(data[offset:offset+4], valueLen)
+				offset = offset + 4
+			}
+
+			key := data[offset : offset+int(keyLen)]
+			offset += int(keyLen)
+
+			value := data[offset : offset+int(valueLen)]
+			offset += int(valueLen)
+
+			pair[string(key)] = string(value)
+		} else {
+			// keyLen4个字节
+			data[offset] = data[offset] & 0x7f
+			binary.BigEndian.PutUint32(data[offset:offset+4], keyLen)
+			offset = offset + 4
+			if data[offset]>>7 == 0 {
+				// valueLen 一个字节
+				valueLen = uint32(data[offset])
+				offset++
+			} else {
+				// valueLen 4个字节
+				data[offset] = data[offset] & 0x7f
+				binary.BigEndian.PutUint32(data[offset:offset+4], valueLen)
+				offset = offset + 4
+			}
+
+			key := data[offset : offset+int(keyLen)]
+			offset += int(keyLen)
+
+			value := data[offset : offset+int(valueLen)]
+			offset += int(valueLen)
+			pair[string(key)] = string(value)
+		}
+	}
+
+	return pair
 }

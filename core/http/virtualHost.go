@@ -25,6 +25,13 @@ func (vh *VirtualHost) Register(component interface{}) {
 	vh.hub.Register(component.(Component))
 }
 
+// Start 虚拟主机启动后调用的函数
+func (vh *VirtualHost) Start() {
+	for _, comp := range vh.hub.container {
+		comp.Start()
+	}
+}
+
 // 接过请求和响应的控制权
 func (vh *VirtualHost) ServeHttp(req *Request, resp *Response) {
 

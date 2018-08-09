@@ -70,6 +70,11 @@ func (srv *Server) Start() {
 		log.Fatal(err)
 	}
 
+	// 启动vh的所有组件
+	for _, vh := range srv.vhs {
+		vh.Start()
+	}
+
 	log.Printf("server start on %s:%d\n", srv.Addr, srv.Port)
 
 	for {
