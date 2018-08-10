@@ -373,7 +373,7 @@ func (fcgi *FastCGI) readHandler(conn net.Conn, req *http.Request, resp *http.Re
 											resp.StatusCode = statusCode
 											resp.Desc = statusRes[1]
 										} else {
-											resp.AppendHeader(strings.ToLower(headerKey), headerValue)
+											resp.AppendHeader(headerKey, headerValue)
 										}
 
 										headerKey = ""

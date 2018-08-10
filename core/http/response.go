@@ -10,12 +10,13 @@ import (
 )
 
 type Response struct {
-	Version    string
-	StatusCode int
-	Desc       string
-	Headers    map[string]string
-	Body       []byte
-	Writer     io.Writer
+	Version      string
+	StatusCode   int
+	Desc         string
+	Headers      map[string]string
+	HeaderCookie []string
+	Body         []byte
+	Writer       io.Writer
 }
 
 func (resp *Response) Init(writer io.Writer) {
@@ -23,9 +24,15 @@ func (resp *Response) Init(writer io.Writer) {
 	resp.Headers = make(map[string]string)
 }
 
-// 向Response中添加响应头
+// AppendHeader会将所有的Header处理成小写 向Response中添加响应头
 func (resp *Response) AppendHeader(k string, v string) {
-	resp.Headers[strings.ToLower(k)] = v
+	k = strings.ToLower(k)
+	if k == "set-cookie" {
+		resp.HeaderCookie = append(resp.HeaderCookie, v)
+	} else {
+		resp.Headers[k] = v
+	}
+
 }
 
 // 将响应转为字符串
@@ -38,6 +45,12 @@ func (resp *Response) toBytes() []byte {
 	for k, v := range resp.Headers {
 		buf.WriteString(k + ": " + v + "\r\n")
 	}
+
+	// 写出cookie
+	for _, v := range resp.HeaderCookie {
+		buf.WriteString("set-cookie: " + v + "\r\n")
+	}
+
 	buf.WriteString("content-length: " + strconv.Itoa(len(resp.Body)) + "\r\n")
 	buf.WriteString("\r\n")
 	buf.Write(resp.Body)
