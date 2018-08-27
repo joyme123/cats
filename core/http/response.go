@@ -78,6 +78,11 @@ func (resp *Response) Error502() {
 	resp.Body = []byte("bad gateway")
 }
 
+func (resp *Response) Status304() {
+	resp.StatusCode = 304
+	resp.Desc = "Not Modifie"
+}
+
 func (resp *Response) out() {
 	_, err := resp.Writer.Write(resp.toBytes())
 
