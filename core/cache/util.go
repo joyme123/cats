@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/joyme123/cats/utils"
 )
 
 // Etag 用来生成文件的etag内容。使用文件的last_modified_time和length来生成
@@ -49,18 +51,7 @@ func LastModified(filepath string) string {
 
 	modtime := GMTTime(filepath)
 
-	return fmtGMT(modtime)
-}
-
-func fmtGMT(time time.Time) string {
-	return fmt.Sprintf("%s, %02d %s %d %02d:%02d:%02d GMT",
-		time.Weekday().String()[0:3],
-		time.Day(),
-		time.Month().String()[0:3],
-		time.Year(),
-		time.Hour(),
-		time.Minute(),
-		time.Second())
+	return utils.FmtGMT(modtime)
 }
 
 // GMTTime 用来获取文件的GMT最后修改时间

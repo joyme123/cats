@@ -7,6 +7,9 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/joyme123/cats/utils"
 )
 
 type Response struct {
@@ -84,6 +87,11 @@ func (resp *Response) Status304() {
 }
 
 func (resp *Response) out() {
+
+	// 在输出信息的时候，添加Date头
+
+	resp.AppendHeader("date", utils.FmtGMT(time.Now()))
+
 	_, err := resp.Writer.Write(resp.toBytes())
 
 	if err != nil {

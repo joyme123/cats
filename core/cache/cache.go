@@ -60,11 +60,19 @@ func (cache *Cache) Serve(req *http.Request, resp *http.Response) {
 		} else if reqDate, ok := req.Headers["if-modified-since"]; ok {
 			if !CompareFileModifiedTime(filepath.(string), reqDate) {
 				// 早于或等于
-				resp.AppendHeader("etag", reqDate)
+				resp.AppendHeader("last-modified", reqDate)
 				// 返回304
 				resp.Status304()
 				return
 			}
+		} else {
+			// 生成etag和lastModified头
+			etagStr := Etag(filepath.(string))
+			lastModified := LastModified(filepath.(string))
+
+			resp.AppendHeader("etag", etagStr)
+			resp.AppendHeader("last-modified", lastModified)
+
 		}
 	}
 
@@ -100,5 +108,5 @@ func (cache *Cache) GetIndex() int {
 
 // 获取组件的寄主身份，比如Index,Mime组件应该是属于vhost的，而serveFile和fastcgi是属于location
 func (cache *Cache) GetContainer() string {
-	return "vhost"
+	return "location"
 }

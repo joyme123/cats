@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 func CompleteURI(uri string, indexFiles []string) string {
@@ -70,4 +72,15 @@ func GetAbsolutePath(rootDir string, uri string, indexFiles []string) (string, s
 	}
 
 	return filepath, completeURI
+}
+
+func FmtGMT(time time.Time) string {
+	return fmt.Sprintf("%s, %02d %s %d %02d:%02d:%02d GMT",
+		time.Weekday().String()[0:3],
+		time.Day(),
+		time.Month().String()[0:3],
+		time.Year(),
+		time.Hour(),
+		time.Minute(),
+		time.Second())
 }

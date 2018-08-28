@@ -20,6 +20,12 @@ type Component interface {
 	// 在服务关闭时执行
 	Shutdown()
 
+	// 设置下一个组件
+	SetNext()
+
+	// 调用下一个组件
+	Next()
+
 	// 获取index, index的作用是指定插件的执行顺序
 	GetIndex() int
 
