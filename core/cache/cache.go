@@ -9,6 +9,7 @@ import (
 )
 
 type Cache struct {
+	http.BaseComponent
 	Index   int
 	Context *http.VhostContext // handler的context
 }
@@ -26,6 +27,7 @@ func (cache *Cache) Start() {
 // Serve 获取req中的 If-Modified-Since,If-Unmodified-Since,If-None-Match,If-Match
 // etag 优先级要大于 last-modified
 func (cache *Cache) Serve(req *http.Request, resp *http.Response) {
+	defer cache.Next(req, resp)
 
 	filepath, ok := req.Context["FilePath"]
 

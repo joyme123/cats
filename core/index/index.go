@@ -6,6 +6,7 @@ import (
 )
 
 type Index struct {
+	http.BaseComponent
 	Files      []string
 	Index      int
 	IndexFiles []string
@@ -23,7 +24,7 @@ func (index *Index) Start() {
 }
 
 func (index *Index) Serve(req *http.Request, resp *http.Response) {
-
+	index.Next(req, resp)
 }
 
 func (index *Index) Shutdown() {

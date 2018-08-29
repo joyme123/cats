@@ -15,6 +15,7 @@ import (
 
 // FastCGI 的结构体
 type FastCGI struct {
+	http.BaseComponent
 	Index      int
 	sockAdrr   string             // fastcgi应用程序的socket地址
 	Context    *http.VhostContext // handler的context
@@ -68,6 +69,7 @@ func (fcgi *FastCGI) Start() {
 
 // Serve 方法是FastCGI在有请求到来时被调用的方法
 func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
+	defer fcgi.Next(req, resp)
 
 	if resp.StatusCode != 0 {
 		return

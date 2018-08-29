@@ -8,6 +8,7 @@ import (
 )
 
 type Mime struct {
+	http.BaseComponent
 	mimes   map[string]string
 	Context *http.VhostContext
 	Index   int
@@ -84,6 +85,8 @@ func (mime *Mime) Start() {
 }
 
 func (mime *Mime) Serve(req *http.Request, resp *http.Response) {
+	defer mime.Next(req, resp)
+
 	ctype, haveType := resp.Headers["content-type"]
 
 	if !haveType {

@@ -9,6 +9,7 @@ import (
 )
 
 type ServeFile struct {
+	http.BaseComponent
 	Index   int
 	Context *http.VhostContext
 }
@@ -39,6 +40,7 @@ func (serverFile *ServeFile) commonHeaders(resp *http.Response) {
 }
 
 func (serverFile *ServeFile) Serve(req *http.Request, resp *http.Response) {
+	defer serverFile.Next(req, resp)
 
 	if resp.StatusCode != 0 {
 		return

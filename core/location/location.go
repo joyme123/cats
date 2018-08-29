@@ -13,6 +13,7 @@ import (
 
 // Location 组件
 type Location struct {
+	http.BaseComponent
 	Index             int
 	Context           *http.VhostContext // vhost的context
 	exactMatch        []Pattern          // 通用匹配
@@ -59,6 +60,7 @@ func (loc *Location) Start() {
 
 // Serve 方法是FastCGI在有请求到来时被调用的方法
 func (loc *Location) Serve(req *http.Request, resp *http.Response) {
+	defer loc.Next(req, resp)
 
 	log.Println("location serve")
 

@@ -7,7 +7,7 @@ import (
 )
 
 type VirtualHost struct {
-	hub     Hub
+	head    Component
 	context VhostContext // VirtualHost的上下文环境
 }
 
@@ -21,15 +21,13 @@ func (vh *VirtualHost) GetContext() *VhostContext {
 }
 
 // 向VirtualHost中注入组件
-func (vh *VirtualHost) Register(component interface{}) {
-	vh.hub.Register(component.(Component))
+func (vh *VirtualHost) Register(component Component) {
+	vh.head = component
 }
 
 // Start 虚拟主机启动后调用的函数
 func (vh *VirtualHost) Start() {
-	for _, comp := range vh.hub.container {
-		comp.Start()
-	}
+	vh.head.Start()
 }
 
 // 接过请求和响应的控制权
@@ -42,9 +40,7 @@ func (vh *VirtualHost) ServeHttp(req *Request, resp *Response) {
 
 	resp.Version = req.Version
 
-	for _, comp := range vh.hub.container {
-		comp.Serve(req, resp)
-	}
+	vh.head.Serve(req, resp)
 
 	resp.out()
 

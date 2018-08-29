@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/joyme123/cats/config"
+	"github.com/joyme123/cats/core/cache"
 	"github.com/joyme123/cats/core/fastcgi"
 	"github.com/joyme123/cats/core/http"
 	"github.com/joyme123/cats/core/index"
@@ -28,22 +29,28 @@ func startServe(sites []config.Site) {
 	for _, site := range sites {
 		var vh http.VirtualHost
 		vh.Init()
-		if len(site.Index) != 0 {
-			indexComp := index.Index{}
-			indexComp.New(&site, vh.GetContext())
-			vh.Register(&indexComp)
-		}
+
+		indexComp := index.Index{}
+		indexComp.New(&site, vh.GetContext())
+		vh.Register(&indexComp)
 
 		// TODO: 这里先写死location的注册机制
 		locationComp := location.Location{}
 		locationComp.New(&site, vh.GetContext())
-		vh.Register(&locationComp)
+		// vh.Register(&locationComp)
+		indexComp.SetNext(&locationComp)
 
 		// serveFile应该注册到location组件中
 		if site.Root != "" {
+			// 注册cache组件
+			cacheComp := cache.Cache{}
+			cacheComp.New(&site, vh.GetContext())
+
 			serveFileComp := serveFile.ServeFile{}
 			serveFileComp.New(&site, vh.GetContext())
-			locationComp.Register("/", "", &serveFileComp)
+			locationComp.Register("/", "", &cacheComp)
+
+			cacheComp.SetNext(&serveFileComp)
 		}
 
 		// fcgipass 应该注册到location组件中
@@ -56,7 +63,7 @@ func startServe(sites []config.Site) {
 
 		mimeComp := mime.Mime{}
 		mimeComp.New(&site, vh.GetContext())
-		vh.Register(&mimeComp)
+		locationComp.SetNext(&mimeComp)
 
 		server.SetVirtualHost(site.ServerName, &vh)
 	}

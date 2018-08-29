@@ -71,11 +71,10 @@ func (srv *Server) Start() {
 	}
 
 	// 启动vh的所有组件
-	for _, vh := range srv.vhs {
+	for serverName, vh := range srv.vhs {
 		vh.Start()
+		log.Printf("virtual host start: %v,ip: %v, port: %v\n", serverName, srv.Addr, srv.Port)
 	}
-
-	log.Printf("server start on %s:%d\n", srv.Addr, srv.Port)
 
 	for {
 		conn, err := listener.Accept()
