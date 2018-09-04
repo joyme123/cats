@@ -50,9 +50,9 @@ func (cache *Cache) Serve(req *http.Request, resp *http.Response) {
 			// 根据etag查看更新
 			etagStr := Etag(filepath.(string))
 
-			etagList := strings.Split(etagStr, ",")
-			for _, etag := range etagList {
-				if etag == reqEtag {
+			reqEtagList := strings.Split(reqEtag, ",")
+			for _, reqEtag := range reqEtagList {
+				if CompareETag(reqEtag, etagStr) {
 					resp.AppendHeader("etag", reqEtag)
 					// 返回304
 					resp.Status304()

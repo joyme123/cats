@@ -23,7 +23,13 @@ func Etag(filepath string) string {
 	modtime := fileinfo.ModTime()
 	len := fileinfo.Size()
 
-	return fmt.Sprintf("%x-%x", modtime.Unix(), len)
+	return fmt.Sprintf("\"%x-%x\"", modtime.Unix(), len)
+}
+
+// CompareETag 负责将请求头中的etag和文件的etag进行对比
+// reqEtag 中包含W/开头,表示采用弱比较算法
+func CompareETag(reqEtag string, fileEtag string) bool {
+	return reqEtag == fileEtag
 }
 
 // LastModified 用来生成 GMT 的最后修改时间
