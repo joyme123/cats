@@ -24,6 +24,10 @@ func TestFCGIHeaderToBlob(t *testing.T) {
 	}
 }
 
+func Test65536(t *testing.T) {
+
+}
+
 func TestFCGIBeginRequestRecordToBlob(t *testing.T) {
 	var record FCGIBeginRequestRecord
 

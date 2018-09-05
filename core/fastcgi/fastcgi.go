@@ -186,12 +186,31 @@ func (fcgi *FastCGI) Serve(req *http.Request, resp *http.Response) {
 		fcgi.sendRecord(conn, &emptyParamsRecord)
 
 		// 3.创建并发送stdin请求
-		var stdinRecord FCGIStdinRecord
-		log.Printf("请求体的内容:%s", req.Body)
-		stdinRecord.New(currentID, req.Body)
-		fcgi.sendRecord(conn, &stdinRecord)
+		// 因为stdin流可能超过65535,所以要分次发送
+		bodyLen := len(req.Body)
+		offset := 0
 
-		if len(req.Body) != 0 {
+		for {
+			if bodyLen-offset > 65535 {
+				var stdinRecord FCGIStdinRecord
+				log.Printf("发送stdin:%d\n", 65535)
+				stdinRecord.New(currentID, req.Body[offset:offset+65535])
+				fcgi.sendRecord(conn, &stdinRecord)
+
+				offset = offset + 65535
+			} else {
+
+				if bodyLen-offset != 0 {
+					var stdinRecord FCGIStdinRecord
+					log.Printf("发送stdin:%d\n", bodyLen-offset-1)
+					stdinRecord.New(currentID, req.Body[offset:])
+					fcgi.sendRecord(conn, &stdinRecord)
+				}
+				break
+			}
+		}
+
+		if bodyLen != 0 {
 			var emptyStdinRecord FCGIStdinRecord
 			emptyBytes := make([]byte, 0)
 			emptyStdinRecord.New(currentID, emptyBytes)

@@ -160,18 +160,18 @@ type FCGINameValuePair44 struct {
 // Params是可以在多个Record中存在的，如果一个Record记录不下，把多出的部分放在下一个Record中即可
 type FCGIParamsRecord struct {
 	Header FCGIHeader
-	Body   []byte // 因为contentLength是16位，所以body的最大长度是65536
+	Body   []byte // 因为contentLength是16位，所以body的最大长度是65535(2^16 - 1)
 }
 
 type FCGIGetValuesRecord struct {
 	Header FCGIHeader
-	Body   []byte // 因为contentLength是16位，所以body的最大长度是65536
+	Body   []byte // 因为contentLength是16位，所以body的最大长度是65535
 }
 
 // FCGIStdinRecord 是标准输入输出流
 type FCGIStdinRecord struct {
 	Header FCGIHeader
-	Body   []byte
+	Body   []byte // 因为contentLength是16位，所以body的最大长度是65535
 }
 
 // New 将二进制流转换成header
@@ -405,7 +405,7 @@ func (record *FCGIGetValuesRecord) New(pair map[string]string) {
 	}
 
 	// FIXME: 判断bodyBytes的长度，根据该长度去决定是否生成多条FCGIParamsRecord。
-	// 单条FCGIParamsRecord的ContentLength最多65536
+	// 单条FCGIParamsRecord的ContentLength最多65535
 	record.Body = bodyBytes
 	record.Header.ContentLength = uint16(bodyLen)
 }
